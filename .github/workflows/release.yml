@@ -145,8 +145,11 @@ jobs:
           go build -trimpath -ldflags="-s -w" \
             -o "dist/GoGRPCBridge-grpc-server-${VERSION}-linux-amd64" ./examples/grpc-server
 
-          GOOS=js GOARCH=wasm go build -trimpath \
-            -o "dist/GoGRPCBridge-wasm-client-${VERSION}.wasm" ./examples/wasm-client
+          (
+            cd examples/wasm-client
+            GOOS=js GOARCH=wasm go build -trimpath \
+              -o "../../dist/GoGRPCBridge-wasm-client-${VERSION}.wasm" .
+          )
 
           tar -czf "dist/GoGRPCBridge-examples-${VERSION}-linux-amd64.tar.gz" \
             -C dist "GoGRPCBridge-bridge-${VERSION}-linux-amd64" "GoGRPCBridge-grpc-server-${VERSION}-linux-amd64"

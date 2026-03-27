@@ -631,3 +631,19 @@ S15.4 implementation note (2026-03-27):
   - Requires one more tag run to confirm end-to-end release publication closure.
 - next suggested todo:
   - Trigger follow-up release tag and verify successful GitHub release with artifacts.
+
+### Checkpoint 2026-03-27R
+
+- completed todo:
+  - Fix release artifact build failure for nested-module WASM example path.
+- files changed:
+  - `third_party/GoGRPCBridge/.github/workflows/release.yml`
+  - `third_party/GoGRPCBridge/docs/core/CHANGELOG.md`
+- validation run:
+  - local release-artifact build command simulation for direct bridge, grpc server, and wasm client (nested module build path)
+- result:
+  - WASM release artifact now builds from `examples/wasm-client` module context and outputs into `dist/` as intended.
+- residual risk:
+  - Final closure still depends on successful tag-triggered release publication.
+- next suggested todo:
+  - Push next release tag and verify GitHub release entry and attached artifacts.
