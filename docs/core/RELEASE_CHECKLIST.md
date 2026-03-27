@@ -35,7 +35,7 @@ Use this checklist before creating or publishing a release tag.
 
 - [ ] `MIGRATION.md` updated for any changed or deprecated API usage.
 - [ ] `API_COMPATIBILITY.md` policy remains accurate for this release.
-- [ ] `api_compatibility_baseline.json` reviewed and updated only when intended API changes are approved.
+- [ ] `tools/api_compat_guard/api_compatibility_baseline.json` reviewed and updated only when intended API changes are approved.
 - [ ] Release notes include compatibility-impact summary.
 
 ## Final Approval

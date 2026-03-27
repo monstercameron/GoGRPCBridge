@@ -41,7 +41,7 @@ Browsers do not expose raw TCP/HTTP2 sockets for native gRPC clients. GoGRPCBrid
 | Define auth propagation boundaries | [AUTH_PROPAGATION_BOUNDARIES.md](./AUTH_PROPAGATION_BOUNDARIES.md) |
 | Prepare secure release sign-off | [SECURITY_RELEASE_CHECKLIST.md](./SECURITY_RELEASE_CHECKLIST.md) |
 | Understand compatibility guarantees | [API_COMPATIBILITY.md](./API_COMPATIBILITY.md) |
-| Review API compatibility baseline | [api_compatibility_baseline.json](../../api_compatibility_baseline.json) |
+| Review API compatibility baseline | [api_compatibility_baseline.json](../../tools/api_compat_guard/api_compatibility_baseline.json) |
 | Run tests and benchmarks | [Development Runner](#development-runner) |
 | Understand release quality gates | [QUALITY_GATES.md](./QUALITY_GATES.md) |
 | Run release sign-off checklist | [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) |

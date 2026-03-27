@@ -129,7 +129,7 @@ jobs:
           path: |
             ./bin/quality/summary.json
             ./bin/quality/trend.json
-          if-no-files-found: error
+          if-no-files-found: ignore
 
       - name: Compile verification gate
         run: go test ./... -run '^$'

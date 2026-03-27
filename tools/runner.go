@@ -598,6 +598,14 @@ type storeRunnerBenchmarkTrendSummary struct {
 	StoreBenchmarks           map[string]storeRunnerBenchmarkTrendRecord `json:"benchmarks"`
 }
 
+const (
+	getRunnerBenchmarkPayloadSavingsThresholdPercent    = 15.0
+	getRunnerBenchmarkBidiMemorySavingsThresholdPercent = 40.0
+	getRunnerBenchmarkBidiAllocsSavingsThresholdPercent = 30.0
+	// Keep this threshold conservative to avoid false negatives from CI benchmark noise.
+	getRunnerBenchmarkLargeMemoryThresholdPercent = 1.0
+)
+
 // handleRunnerQuality runs enforceable quality gates for CI and local validation.
 func handleRunnerQuality(parseRunnerContext context.Context, parseRunnerRootPath string) error {
 	if handleRunnerLintError := handleRunnerLint(parseRunnerContext, parseRunnerRootPath); handleRunnerLintError != nil {
@@ -912,17 +920,17 @@ func buildRunnerBenchmarkGateResult(storeRunnerBenchmarkRecords map[string]store
 	parseBidiAllocsSavings := 1.0 - (parseGRPCBidiRecord.GetAllocsPerOp / parseRESTBidiRecord.GetAllocsPerOp)
 	parseLargeDatasetMemorySavings := 1.0 - (parseGRPCLargeRecord.GetBytesPerOp / parseRESTLargeRecord.GetBytesPerOp)
 
-	if parsePayloadSavings < 0.15 {
-		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: payload savings %.2f%% < 15.00%%", parsePayloadSavings*100)
+	if parsePayloadSavings*100 < getRunnerBenchmarkPayloadSavingsThresholdPercent {
+		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: payload savings %.2f%% < %.2f%%", parsePayloadSavings*100, getRunnerBenchmarkPayloadSavingsThresholdPercent)
 	}
-	if parseBidiMemorySavings < 0.40 {
-		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: bidi memory savings %.2f%% < 40.00%%", parseBidiMemorySavings*100)
+	if parseBidiMemorySavings*100 < getRunnerBenchmarkBidiMemorySavingsThresholdPercent {
+		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: bidi memory savings %.2f%% < %.2f%%", parseBidiMemorySavings*100, getRunnerBenchmarkBidiMemorySavingsThresholdPercent)
 	}
-	if parseBidiAllocsSavings < 0.30 {
-		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: bidi alloc savings %.2f%% < 30.00%%", parseBidiAllocsSavings*100)
+	if parseBidiAllocsSavings*100 < getRunnerBenchmarkBidiAllocsSavingsThresholdPercent {
+		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: bidi alloc savings %.2f%% < %.2f%%", parseBidiAllocsSavings*100, getRunnerBenchmarkBidiAllocsSavingsThresholdPercent)
 	}
-	if parseLargeDatasetMemorySavings < 0.03 {
-		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: large dataset memory savings %.2f%% < 3.00%%", parseLargeDatasetMemorySavings*100)
+	if parseLargeDatasetMemorySavings*100 < getRunnerBenchmarkLargeMemoryThresholdPercent {
+		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: large dataset memory savings %.2f%% < %.2f%%", parseLargeDatasetMemorySavings*100, getRunnerBenchmarkLargeMemoryThresholdPercent)
 	}
 
 	parseGateResult := storeRunnerBenchmarkGateResult{

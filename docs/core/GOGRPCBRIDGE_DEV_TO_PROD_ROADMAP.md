@@ -389,7 +389,7 @@ S15.4 implementation note (2026-03-27):
   - S14.7 Add governance enforcement for API lifecycle guarantees (compatibility policy checks and migration coverage in release gates).
 - files changed:
   - `third_party/GoGRPCBridge/tools/api_compat_guard/main.go`
-  - `third_party/GoGRPCBridge/api_compatibility_baseline.json`
+  - `third_party/GoGRPCBridge/tools/api_compat_guard/api_compatibility_baseline.json`
   - `third_party/GoGRPCBridge/.github/workflows/release.yml`
   - `.github/workflows/gogrpcbridge-ci.yml`
   - `docs/GOGRPCBRIDGE_REQUIRED_CHECKS.md`
@@ -618,7 +618,7 @@ S15.4 implementation note (2026-03-27):
   - Fix API governance release failure from clean clone by committing required baseline artifact.
 - files changed:
   - `third_party/GoGRPCBridge/.gitignore`
-  - `third_party/GoGRPCBridge/api_compatibility_baseline.json`
+  - `third_party/GoGRPCBridge/tools/api_compat_guard/api_compatibility_baseline.json`
   - `third_party/GoGRPCBridge/docs/core/CHANGELOG.md`
 - validation run:
   - `go run ./tools/api_compat_guard update`

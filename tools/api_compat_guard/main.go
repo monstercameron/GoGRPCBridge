@@ -48,7 +48,7 @@ func handleAPIGuardMain(parseArguments []string) error {
 		return parseErr
 	}
 
-	parseBaselinePath := filepath.Join(parseRepositoryRootPath, "api_compatibility_baseline.json")
+	parseBaselinePath := filepath.Join(parseRepositoryRootPath, "tools", "api_compat_guard", "api_compatibility_baseline.json")
 	switch parseCommand {
 	case "check":
 		if parseErr = handleAPIGuardDocumentationCheck(parseRepositoryRootPath); parseErr != nil {

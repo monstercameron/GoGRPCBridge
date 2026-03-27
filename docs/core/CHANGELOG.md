@@ -43,7 +43,7 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ### Highlights
 
-- Unignored and committed `api_compatibility_baseline.json` so release CI can run API governance checks from clean clones/tags.
+- Tracked `tools/api_compat_guard/api_compatibility_baseline.json` so release CI can run API governance checks from clean clones/tags.
 
 ## [v0.0.16] - 2026-03-27
 
