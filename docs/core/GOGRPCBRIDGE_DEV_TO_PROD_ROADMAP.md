@@ -611,3 +611,23 @@ S15.4 implementation note (2026-03-27):
   - If failures are deterministic (not transient), release still fails after retry and requires root-cause fixes in code or thresholds.
 - next suggested todo:
   - Execute follow-up tag and verify successful release creation with uploaded assets.
+
+### Checkpoint 2026-03-27Q
+
+- completed todo:
+  - Fix API governance release failure from clean clone by committing required baseline artifact.
+- files changed:
+  - `third_party/GoGRPCBridge/.gitignore`
+  - `third_party/GoGRPCBridge/api_compatibility_baseline.json`
+  - `third_party/GoGRPCBridge/docs/core/CHANGELOG.md`
+- validation run:
+  - `go run ./tools/api_compat_guard update`
+  - `go run ./tools/api_compat_guard check`
+  - clean clone simulation at `v0.0.16` confirmed missing baseline as root cause
+- result:
+  - API baseline is now repository-tracked and no longer dropped by `*.json` ignore rules.
+  - Release API governance step is now compatible with clean tag clones in CI.
+- residual risk:
+  - Requires one more tag run to confirm end-to-end release publication closure.
+- next suggested todo:
+  - Trigger follow-up release tag and verify successful GitHub release with artifacts.

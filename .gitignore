@@ -29,6 +29,7 @@ examples/_shared/data/
 *.json
 !benchmarks/quality_baseline.json
 !docs/catalog.json
+!api_compatibility_baseline.json
 !go.json
 !go.sum
 !package.json
