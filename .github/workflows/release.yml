@@ -67,9 +67,19 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Run release quality gate
-        run: go run ./tools/runner.go quality
-        env:
-          RUNNER_STRICT_RACE: "1"
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            if RUNNER_STRICT_RACE=1 go run ./tools/runner.go quality; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 2 ]; then
+              echo "Release quality gate failed after retry."
+              exit 1
+            fi
+            echo "Release quality gate failed on attempt $attempt. Retrying once..."
+            sleep 10
+          done
 
       - name: Run canonical publish identity check
         run: go run ./tools/runner.go canonical-publish-check

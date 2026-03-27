@@ -595,3 +595,19 @@ S15.4 implementation note (2026-03-27):
   - End-to-end closure still depends on successful release run and visible GitHub release artifacts on the next tag.
 - next suggested todo:
   - Re-run the release tag workflow and verify public release entry plus uploaded assets.
+
+### Checkpoint 2026-03-27P
+
+- completed todo:
+  - Add controlled retry to release quality gate after observed transient pass/fail divergence versus `test.yml`.
+- files changed:
+  - `third_party/GoGRPCBridge/.github/workflows/release.yml`
+  - `third_party/GoGRPCBridge/docs/core/CHANGELOG.md`
+- validation run:
+  - release and test workflow timeline comparison for the same commit via GitHub Actions run/job API
+- result:
+  - Release quality gate now retries once before failing hard, reducing transient flake while preserving strict gate enforcement.
+- residual risk:
+  - If failures are deterministic (not transient), release still fails after retry and requires root-cause fixes in code or thresholds.
+- next suggested todo:
+  - Execute follow-up tag and verify successful release creation with uploaded assets.

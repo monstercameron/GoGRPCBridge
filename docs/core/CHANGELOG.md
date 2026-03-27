@@ -26,6 +26,12 @@ The format is based on Keep a Changelog and this project follows semantic versio
 - Hardened `canonical-publish-check` to accept canonical and legacy repository URLs, support fork-safe CI mode (`RUNNER_CANONICAL_SKIP_ORIGIN=1`), and validate clean-consumer server and WASM compile smoke builds.
 - Updated release and CI workflows to align with Go 1.25.x, moved release changelog extraction to `docs/core/CHANGELOG.md`, added `pkg.go.dev` discoverability checks in release validation, and replaced blind push-based auto patch tagging with intentional workflow-dispatch semver tagging.
 
+## [v0.0.16] - 2026-03-27
+
+### Highlights
+
+- Added one-time retry logic for the release quality gate to reduce transient CI flake while preserving strict failure behavior on repeat failure.
+
 ## [v0.0.15] - 2026-03-27
 
 ### Highlights
