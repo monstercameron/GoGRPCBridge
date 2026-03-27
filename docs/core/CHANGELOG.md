@@ -16,6 +16,9 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ### Changed
 
+- Hardened `test.yml` quality gates with one retry and persisted `bin/quality/quality.log` artifact upload for faster CI failure diagnosis.
+- Hardened `release.yml` by capturing quality gate logs, forcing Node 24 action runtime, and adding post-publish release visibility/asset verification.
+- Stabilized runner benchmark gating with a built-in retry pass to reduce transient benchmark-noise failures in CI.
 - Reorganized repository docs into `docs/core`, `docs/examples`, `docs/benchmarks`, and `docs/observability`, and updated `docs/catalog.json` + docs portal path resolution accordingly.
 - Added root GitHub-facing wrapper files (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`) that point to canonical docs under `docs/`.
 - Removed stale `Makefile` references from docs and removed `Makefile` from the repository in favor of the Go runner workflow (`go run ./tools/runner.go ...`).

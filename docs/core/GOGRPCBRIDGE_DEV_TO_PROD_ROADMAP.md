@@ -232,9 +232,9 @@ S15.4 implementation note (2026-03-27):
 
 ## Priority Order
 
-- [ ] P0 Fix canonical identity split and make clean install/import/compile proof pass.
-- [ ] P1 Make Releases reliably visible with assets and intentional semver.
-- [ ] P2 Consolidate CI truth source and security-lane parity.
+- [x] P0 Fix canonical identity split and make clean install/import/compile proof pass.
+- [ ] P1 Make Releases reliably visible for every tag, including post-publish verification and durable release artifacts.
+- [ ] P2 Add release provenance/signing artifacts (SBOM + attestations) and document verification flow.
 - [ ] P3 Land internet-facing abuse controls and resilience coverage.
 - [ ] P4 Ship golden production path and support matrix.
 

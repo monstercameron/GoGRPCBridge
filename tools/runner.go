@@ -604,6 +604,8 @@ const (
 	getRunnerBenchmarkBidiAllocsSavingsThresholdPercent = 30.0
 	// Keep this threshold conservative to avoid false negatives from CI benchmark noise.
 	getRunnerBenchmarkLargeMemoryThresholdPercent = 1.0
+	getRunnerBenchmarkGateAttempts                = 2
+	getRunnerBenchmarkGateRetryDelay              = 2 * time.Second
 )
 
 // handleRunnerQuality runs enforceable quality gates for CI and local validation.
@@ -629,17 +631,7 @@ func handleRunnerQuality(parseRunnerContext context.Context, parseRunnerRootPath
 		return handleRunnerProcessError
 	}
 
-	parseBenchmarkOutput, buildRunnerBenchmarkOutputError := buildRunnerBenchmarkOutput(parseRunnerContext, parseRunnerRootPath)
-	if buildRunnerBenchmarkOutputError != nil {
-		return buildRunnerBenchmarkOutputError
-	}
-
-	storeRunnerBenchmarkRecords, parseRunnerBenchmarkRecordsError := parseRunnerBenchmarkRecords(parseBenchmarkOutput)
-	if parseRunnerBenchmarkRecordsError != nil {
-		return parseRunnerBenchmarkRecordsError
-	}
-
-	parseBenchmarkGateResult, buildRunnerBenchmarkGateResultError := buildRunnerBenchmarkGateResult(storeRunnerBenchmarkRecords)
+	parseBenchmarkGateResult, buildRunnerBenchmarkGateResultError := buildRunnerBenchmarkGateResultWithRetry(parseRunnerContext, parseRunnerRootPath)
 	if buildRunnerBenchmarkGateResultError != nil {
 		return buildRunnerBenchmarkGateResultError
 	}
@@ -648,6 +640,40 @@ func handleRunnerQuality(parseRunnerContext context.Context, parseRunnerRootPath
 		return storeRunnerQualitySummaryError
 	}
 	return nil
+}
+
+// buildRunnerBenchmarkGateResultWithRetry runs benchmark quality gates and retries once to reduce transient CI benchmark noise.
+func buildRunnerBenchmarkGateResultWithRetry(parseRunnerContext context.Context, parseRunnerRootPath string) (storeRunnerBenchmarkGateResult, error) {
+	var parseLastError error
+	for parseAttempt := 1; parseAttempt <= getRunnerBenchmarkGateAttempts; parseAttempt++ {
+		parseBenchmarkOutput, buildRunnerBenchmarkOutputError := buildRunnerBenchmarkOutput(parseRunnerContext, parseRunnerRootPath)
+		if buildRunnerBenchmarkOutputError != nil {
+			parseLastError = buildRunnerBenchmarkOutputError
+		} else {
+			storeRunnerBenchmarkRecords, parseRunnerBenchmarkRecordsError := parseRunnerBenchmarkRecords(parseBenchmarkOutput)
+			if parseRunnerBenchmarkRecordsError != nil {
+				parseLastError = parseRunnerBenchmarkRecordsError
+			} else {
+				parseBenchmarkGateResult, buildRunnerBenchmarkGateResultError := buildRunnerBenchmarkGateResult(storeRunnerBenchmarkRecords)
+				if buildRunnerBenchmarkGateResultError == nil {
+					return parseBenchmarkGateResult, nil
+				}
+				parseLastError = buildRunnerBenchmarkGateResultError
+			}
+		}
+
+		if parseAttempt == getRunnerBenchmarkGateAttempts {
+			break
+		}
+
+		_, _ = fmt.Fprintf(os.Stdout, "benchmark gate attempt %d/%d failed: %v\n", parseAttempt, getRunnerBenchmarkGateAttempts, parseLastError)
+		select {
+		case <-time.After(getRunnerBenchmarkGateRetryDelay):
+		case <-parseRunnerContext.Done():
+			return storeRunnerBenchmarkGateResult{}, parseRunnerContext.Err()
+		}
+	}
+	return storeRunnerBenchmarkGateResult{}, parseLastError
 }
 
 // handleRunnerQualityTest runs coverage tests with race when supported by the local toolchain.

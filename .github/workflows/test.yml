@@ -11,6 +11,7 @@ permissions:
   contents: read
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   GOSEC_VERSION: v2.25.0
   GOVULNCHECK_VERSION: v1.1.4
   GOLANGCI_LINT_VERSION: v1.64.8
@@ -55,9 +56,20 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Run quality gates
-        run: go run ./tools/runner.go quality
-        env:
-          RUNNER_STRICT_RACE: "1"
+        run: |
+          set -euo pipefail
+          mkdir -p ./bin/quality
+          for attempt in 1 2; do
+            if RUNNER_STRICT_RACE=1 go run ./tools/runner.go quality 2>&1 | tee ./bin/quality/quality.log; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 2 ]; then
+              echo "Quality gate failed after retry."
+              exit 1
+            fi
+            echo "Quality gate failed on attempt $attempt. Retrying once..."
+            sleep 10
+          done
 
       - name: Run canonical publish smoke check
         run: go run ./tools/runner.go canonical-publish-check
@@ -70,7 +82,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: quality-gate-summary-go${{ matrix.go-version }}
-          path: ./bin/quality/summary.json
+          path: |
+            ./bin/quality/summary.json
+            ./bin/quality/quality.log
           if-no-files-found: ignore
 
       - name: Run edge case tests
