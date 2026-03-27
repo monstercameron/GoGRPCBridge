@@ -556,3 +556,22 @@ S15.4 implementation note (2026-03-27):
   - `v0.0.12` release run remains failed and should be superseded by a new tag after these fixes.
 - next suggested todo:
   - Re-run controlled release on next semver tag and verify public release visibility plus attached artifacts.
+
+### Checkpoint 2026-03-27N
+
+- completed todo:
+  - Hotfix failed `v0.0.13` release-toolchain bootstrap command and re-run controlled tag release.
+- files changed:
+  - `third_party/GoGRPCBridge/.github/workflows/test.yml`
+  - `third_party/GoGRPCBridge/.github/workflows/release.yml`
+  - `third_party/GoGRPCBridge/docs/core/CHANGELOG.md`
+- validation run:
+  - GitHub Actions failure triage via run/job API (`Install quality toolchain` step failure)
+  - local workflow command sanity (`go run ./tools/runner.go quality`, `go run ./tools/runner.go canonical-publish-check`)
+- result:
+  - Fixed duplicate-version-prefix bug in `goimports` install command (`@${GOIMPORTS_VERSION}` instead of `@v${GOIMPORTS_VERSION}`).
+  - Prepared follow-up tag release to validate end-to-end publication path.
+- residual risk:
+  - Must confirm release workflow completion and GitHub Releases artifact publication on the follow-up tag.
+- next suggested todo:
+  - Close S15.4 with verified release entry and attached artifacts for the new tag.
