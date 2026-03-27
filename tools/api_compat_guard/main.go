@@ -207,18 +207,24 @@ func getAPIGuardReceiverTypeName(parseTypeExpression ast.Expr) string {
 // handleAPIGuardDocumentationCheck validates migration and compatibility documentation sections required by policy.
 func handleAPIGuardDocumentationCheck(parseRepositoryRootPath string) error {
 	parseChecks := []struct {
-		parsePath     string
+		parsePaths    []string
 		parsePatterns []string
 	}{
 		{
-			parsePath: filepath.Join(parseRepositoryRootPath, "API_COMPATIBILITY.md"),
+			parsePaths: []string{
+				"docs/core/API_COMPATIBILITY.md",
+				"API_COMPATIBILITY.md",
+			},
 			parsePatterns: []string{
 				"## Deprecation Lifecycle",
 				"## CI and Release Enforcement",
 			},
 		},
 		{
-			parsePath: filepath.Join(parseRepositoryRootPath, "MIGRATION.md"),
+			parsePaths: []string{
+				"docs/core/MIGRATION.md",
+				"MIGRATION.md",
+			},
 			parsePatterns: []string{
 				"## Old to New Mapping",
 			},
@@ -226,18 +232,36 @@ func handleAPIGuardDocumentationCheck(parseRepositoryRootPath string) error {
 	}
 
 	for _, parseCheck := range parseChecks {
-		parseContents, parseErr := os.ReadFile(parseCheck.parsePath)
+		parseDocumentationPath, parseErr := getAPIGuardDocumentationPath(parseRepositoryRootPath, parseCheck.parsePaths)
 		if parseErr != nil {
-			return fmt.Errorf("failed to read documentation file %q: %w", parseCheck.parsePath, parseErr)
+			return parseErr
+		}
+
+		parseContents, parseErr := os.ReadFile(parseDocumentationPath)
+		if parseErr != nil {
+			return fmt.Errorf("failed to read documentation file %q: %w", parseDocumentationPath, parseErr)
 		}
 		parseText := string(parseContents)
 		for _, parsePattern := range parseCheck.parsePatterns {
 			if !strings.Contains(parseText, parsePattern) {
-				return fmt.Errorf("documentation guard failed: file %q is missing section %q", parseCheck.parsePath, parsePattern)
+				return fmt.Errorf("documentation guard failed: file %q is missing section %q", parseDocumentationPath, parsePattern)
 			}
 		}
 	}
 	return nil
+}
+
+// getAPIGuardDocumentationPath resolves the first existing documentation path from ordered candidates.
+func getAPIGuardDocumentationPath(parseRepositoryRootPath string, parseRelativePaths []string) (string, error) {
+	storeCheckedPaths := make([]string, 0, len(parseRelativePaths))
+	for _, parseRelativePath := range parseRelativePaths {
+		parseDocumentationPath := filepath.Join(parseRepositoryRootPath, parseRelativePath)
+		storeCheckedPaths = append(storeCheckedPaths, parseDocumentationPath)
+		if _, parseErr := os.Stat(parseDocumentationPath); parseErr == nil {
+			return parseDocumentationPath, nil
+		}
+	}
+	return "", fmt.Errorf("failed to locate documentation file; checked: %s", strings.Join(storeCheckedPaths, ", "))
 }
 
 // handleAPIGuardBaselineCheck compares current package symbols against the stored compatibility baseline.

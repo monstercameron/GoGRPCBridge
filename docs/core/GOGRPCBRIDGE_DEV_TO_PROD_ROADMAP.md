@@ -575,3 +575,23 @@ S15.4 implementation note (2026-03-27):
   - Must confirm release workflow completion and GitHub Releases artifact publication on the follow-up tag.
 - next suggested todo:
   - Close S15.4 with verified release entry and attached artifacts for the new tag.
+
+### Checkpoint 2026-03-27O
+
+- completed todo:
+  - Fix release API-governance failure caused by stale root-doc path assumptions.
+- files changed:
+  - `third_party/GoGRPCBridge/tools/api_compat_guard/main.go`
+  - `third_party/GoGRPCBridge/tools/api_compat_guard/main_test.go`
+  - `third_party/GoGRPCBridge/docs/core/CHANGELOG.md`
+- validation run:
+  - `go test ./tools/api_compat_guard -count=1`
+  - `go run ./tools/api_compat_guard check`
+  - `go run ./tools/runner.go quality`
+- result:
+  - API guard now resolves canonical docs under `docs/core` and still supports legacy root-path fallback.
+  - Release governance check is now aligned with the current repository documentation layout.
+- residual risk:
+  - End-to-end closure still depends on successful release run and visible GitHub release artifacts on the next tag.
+- next suggested todo:
+  - Re-run the release tag workflow and verify public release entry plus uploaded assets.
