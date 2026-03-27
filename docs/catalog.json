@@ -65,6 +65,26 @@
         "section":  "Core"
     },
     {
+        "path":  "core/GOGRPCBRIDGE_DEV_TO_PROD_ROADMAP.md",
+        "title":  "Gogrpcbridge Dev To Prod Roadmap",
+        "section":  "Core"
+    },
+    {
+        "path":  "core/GOGRPCBRIDGE_INTEGRATION_MATRIX.md",
+        "title":  "Gogrpcbridge Integration Matrix",
+        "section":  "Core"
+    },
+    {
+        "path":  "core/GOGRPCBRIDGE_REQUIRED_CHECKS.md",
+        "title":  "Gogrpcbridge Required Checks",
+        "section":  "Core"
+    },
+    {
+        "path":  "core/GOGRPCBRIDGE_SUBMODULE_LIFECYCLE.md",
+        "title":  "Gogrpcbridge Submodule Lifecycle",
+        "section":  "Core"
+    },
+    {
         "path":  "core/MAINTENANCE_SCHEDULE.md",
         "title":  "Maintenance Schedule",
         "section":  "Core"

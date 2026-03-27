@@ -20,6 +20,8 @@ The format is based on Keep a Changelog and this project follows semantic versio
 - Added root GitHub-facing wrapper files (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`) that point to canonical docs under `docs/`.
 - Removed stale `Makefile` references from docs and removed `Makefile` from the repository in favor of the Go runner workflow (`go run ./tools/runner.go ...`).
 - Expanded ignore coverage for local benchmark and coverage artifacts (`coverage.txt`, `perf_*.out`, `benchmarks.test.exe`) and cleaned generated local artifacts.
+- Reworked root `README.md` into a technical product landing page with executable server/WASM integration snippets, architecture flow, production-hardening controls, and benchmark evidence drawn from `benchmarks/quality_baseline.json`.
+- Added host-repo operational docs (`GOGRPCBRIDGE_*`) into canonical `docs/core/` and indexed them in docs navigation/catalog.
 
 ## [v0.0.11] - 2026-03-27
 
