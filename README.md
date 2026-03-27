@@ -3,8 +3,8 @@
 Native gRPC in the browser using WebSocket transport, without rewriting your service contracts.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/monstercameron/grpc-tunnel.svg)](https://pkg.go.dev/github.com/monstercameron/grpc-tunnel)
-[![Test](https://github.com/monstercameron/grpc-tunnel/workflows/Test/badge.svg)](https://github.com/monstercameron/grpc-tunnel/actions/workflows/test.yml)
-[![Release](https://github.com/monstercameron/grpc-tunnel/workflows/Release/badge.svg)](https://github.com/monstercameron/grpc-tunnel/actions/workflows/release.yml)
+[![Test](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/test.yml/badge.svg)](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/test.yml)
+[![Release](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/release.yml/badge.svg)](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## What You Get
@@ -33,6 +33,13 @@ go get github.com/monstercameron/grpc-tunnel@latest
 ```
 
 Requires Go 1.25+ (see `go.mod` toolchain requirements).
+
+## Module Identity
+
+- GitHub repository: `github.com/monstercameron/GoGRPCBridge`
+- Canonical Go module path: `github.com/monstercameron/grpc-tunnel`
+
+The module path remains `github.com/monstercameron/grpc-tunnel` for consumer compatibility and existing `go get` installs. Use the module path for imports and `go get`, and use `GoGRPCBridge` as the project/repository name.
 
 ## Show, Not Tell: Minimal Integration
 
@@ -152,6 +159,8 @@ go run ./tools/runner.go quality-trend
 go run ./tools/runner.go canonical-publish-check
 ```
 
+`canonical-publish-check` verifies module path alignment, accepted repository identity (`GoGRPCBridge` plus legacy module repository URL), and a clean-consumer `go get` + compile smoke test.
+
 Release workflow also enforces:
 
 - `gosec` high-severity/high-confidence policy
@@ -164,6 +173,7 @@ Release workflow also enforces:
 
 - Core technical docs: [docs/core/README.md](./docs/core/README.md)
 - Docs index: [docs/core/DOCS_INDEX.md](./docs/core/DOCS_INDEX.md)
+- Module/repository identity policy: [docs/core/MODULE_IDENTITY.md](./docs/core/MODULE_IDENTITY.md)
 - Threat model: [docs/core/THREAT_MODEL.md](./docs/core/THREAT_MODEL.md)
 - Security release checklist: [docs/core/SECURITY_RELEASE_CHECKLIST.md](./docs/core/SECURITY_RELEASE_CHECKLIST.md)
 - Performance notes: [docs/core/PERFORMANCE_OPTIMIZATION_NOTES.md](./docs/core/PERFORMANCE_OPTIMIZATION_NOTES.md)

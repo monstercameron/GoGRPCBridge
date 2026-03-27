@@ -22,6 +22,20 @@ The format is based on Keep a Changelog and this project follows semantic versio
 - Expanded ignore coverage for local benchmark and coverage artifacts (`coverage.txt`, `perf_*.out`, `benchmarks.test.exe`) and cleaned generated local artifacts.
 - Reworked root `README.md` into a technical product landing page with executable server/WASM integration snippets, architecture flow, production-hardening controls, and benchmark evidence drawn from `benchmarks/quality_baseline.json`.
 - Added host-repo operational docs (`GOGRPCBRIDGE_*`) into canonical `docs/core/` and indexed them in docs navigation/catalog.
+- Added explicit module/repository identity policy docs (`docs/core/MODULE_IDENTITY.md`) and linked the policy from README and docs index.
+- Hardened `canonical-publish-check` to accept canonical and legacy repository URLs, support fork-safe CI mode (`RUNNER_CANONICAL_SKIP_ORIGIN=1`), and validate clean-consumer server and WASM compile smoke builds.
+- Updated release and CI workflows to align with Go 1.25.x, moved release changelog extraction to `docs/core/CHANGELOG.md`, added `pkg.go.dev` discoverability checks in release validation, and replaced blind push-based auto patch tagging with intentional workflow-dispatch semver tagging.
+
+## [v0.0.12] - 2026-03-27
+
+### Highlights
+
+- Added getting-started execution docs and top-of-portal quick links for onboarding (`GETTING_STARTED_TODOS.md`, `GETTING_STARTED_ADVANCED.md`).
+- Added explicit module identity policy documentation and linked it from the primary docs navigation.
+- Hardened canonical publish verification to include clean-consumer server and WASM compile smoke checks.
+- Fixed release notes extraction path to `docs/core/CHANGELOG.md` and added `pkg.go.dev` discoverability verification in release workflow.
+- Replaced blind push-based auto patch tagging with intentional workflow-dispatch semver tagging (`major`, `minor`, `patch`, or explicit version).
+- Demoted `build.yml` to manual/build-sanity use and aligned CI/release workflows to Go `1.25.x`.
 
 ## [v0.0.11] - 2026-03-27
 

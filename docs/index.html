@@ -69,6 +69,31 @@
       max-width: 78rem;
     }
 
+    .topbarQuickLinks {
+      margin-top: 0.72rem;
+      display: flex;
+      gap: 0.52rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .topbarQuickLink {
+      border: 1px solid var(--getDocsBorder);
+      border-radius: 999px;
+      background: var(--getDocsPanelSoft);
+      color: var(--getDocsText);
+      font-size: 0.84rem;
+      padding: 0.24rem 0.62rem;
+      text-decoration: none;
+      line-height: 1.2;
+    }
+
+    .topbarQuickLink:hover,
+    .topbarQuickLink:focus {
+      text-decoration: none;
+      background: var(--getDocsButtonHover);
+    }
+
     .topbarActions {
       margin-top: 0.8rem;
       display: flex;
@@ -301,6 +326,18 @@
     <p>
       Public documentation portal for every repository Markdown document. Each section includes direct file references to help locate the source file quickly.
     </p>
+    <div class="topbarQuickLinks">
+      <a
+        href="#doc-core-getting-started-todos-md"
+        class="topbarQuickLink"
+        data-doc-path="core/GETTING_STARTED_TODOS.md"
+      >Getting Started TODOs</a>
+      <a
+        href="#doc-core-getting-started-advanced-md"
+        class="topbarQuickLink"
+        data-doc-path="core/GETTING_STARTED_ADVANCED.md"
+      >Getting Started Advanced</a>
+    </div>
     <div class="topbarActions">
       <button id="handleDocsLoadNext" class="controlButton" type="button">Load Next Batch</button>
       <button id="handleDocsLoadAll" class="controlButton" type="button">Load All Docs</button>
@@ -633,6 +670,15 @@
       applyDocsTheme(getDocsNextTheme);
     }
 
+    function handleDocsTopLinkClick(getDocsEvent) {
+      const getDocsPath = getDocsEvent.currentTarget.getAttribute("data-doc-path");
+      if (!getDocsPath) {
+        return;
+      }
+      getDocsEvent.preventDefault();
+      handleDocsScrollToPath(getDocsPath);
+    }
+
     async function startDocsPage() {
       try {
         setDocsCatalog = await getDocsCatalogList();
@@ -647,6 +693,9 @@
         document.getElementById("handleDocsLoadAll").addEventListener("click", handleDocsLoadAllBatches);
         document.getElementById("handleDocsThemeToggle").addEventListener("click", handleDocsThemeToggle);
         document.getElementById("filterDocsInput").addEventListener("input", handleDocsFilterInput);
+        document.querySelectorAll(".topbarQuickLink").forEach(function (getDocsTopLink) {
+          getDocsTopLink.addEventListener("click", handleDocsTopLinkClick);
+        });
 
         await handleDocsLoadAllBatches();
       } catch (getDocsError) {

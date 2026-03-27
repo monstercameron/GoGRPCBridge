@@ -25,7 +25,10 @@ type storeRunnerCommand struct {
 }
 
 const parseRunnerCanonicalModulePath = "github.com/monstercameron/grpc-tunnel"
-const parseRunnerCanonicalRepositoryURL = "https://github.com/monstercameron/grpc-tunnel"
+const parseRunnerCanonicalRepositoryURL = "https://github.com/monstercameron/GoGRPCBridge"
+const parseRunnerLegacyRepositoryURL = "https://github.com/monstercameron/grpc-tunnel"
+const parseRunnerCanonicalGoProxyEnvKey = "RUNNER_CANONICAL_GOPROXY"
+const parseRunnerCanonicalSkipOriginEnvKey = "RUNNER_CANONICAL_SKIP_ORIGIN"
 
 // main executes the repository task runner.
 func main() {
@@ -243,23 +246,30 @@ func handleRunnerCanonicalPublishCheck(parseRunnerContext context.Context, parse
 		)
 	}
 
-	parseOriginURLOutput, parseOriginURLError := buildRunnerProcessOutput(parseRunnerContext, parseRunnerRootPath, parseRunnerRootPath, nil, "git", "remote", "get-url", "origin")
-	if parseOriginURLError != nil {
-		return parseOriginURLError
-	}
-	parseOriginURL := strings.TrimSpace(parseOriginURLOutput)
-	parseOriginURL = normalizeRunnerRepositoryURL(parseOriginURL)
-	parseCanonicalRepositoryURL := normalizeRunnerRepositoryURL(parseRunnerCanonicalRepositoryURL)
-	if parseOriginURL != parseCanonicalRepositoryURL {
-		return fmt.Errorf(
-			"canonical publish check failed: origin remote %q does not match canonical repository %q",
-			parseOriginURL,
-			parseCanonicalRepositoryURL,
-		)
+	storeRunnerCanonicalRepositoryURLs := buildRunnerCanonicalRepositoryURLs()
+	parseCanonicalRepositoryURL := storeRunnerCanonicalRepositoryURLs[0]
+	if !hasRunnerSkipCanonicalOriginCheck() {
+		parseOriginURLOutput, parseOriginURLError := buildRunnerProcessOutput(parseRunnerContext, parseRunnerRootPath, parseRunnerRootPath, nil, "git", "remote", "get-url", "origin")
+		if parseOriginURLError != nil {
+			return parseOriginURLError
+		}
+		parseOriginURL := strings.TrimSpace(parseOriginURLOutput)
+		parseOriginURL = normalizeRunnerRepositoryURL(parseOriginURL)
+		if !hasRunnerCanonicalRepositoryURL(parseOriginURL, storeRunnerCanonicalRepositoryURLs) {
+			return fmt.Errorf(
+				"canonical publish check failed: origin remote %q does not match accepted canonical repositories %q",
+				parseOriginURL,
+				strings.Join(storeRunnerCanonicalRepositoryURLs, ", "),
+			)
+		}
+	} else {
+		_, _ = fmt.Fprintln(os.Stdout, "canonical publish check: skipping origin remote validation")
 	}
 
-	if _, parseRepositoryLookupError := buildRunnerProcessOutput(parseRunnerContext, parseRunnerRootPath, parseRunnerRootPath, nil, "git", "ls-remote", parseRunnerCanonicalRepositoryURL, "HEAD"); parseRepositoryLookupError != nil {
-		return fmt.Errorf("canonical publish check failed: canonical repository is not reachable: %w", parseRepositoryLookupError)
+	for _, parseRepositoryURL := range storeRunnerCanonicalRepositoryURLs {
+		if _, parseRepositoryLookupError := buildRunnerProcessOutput(parseRunnerContext, parseRunnerRootPath, parseRunnerRootPath, nil, "git", "ls-remote", parseRepositoryURL, "HEAD"); parseRepositoryLookupError != nil {
+			return fmt.Errorf("canonical publish check failed: repository %q is not reachable: %w", parseRepositoryURL, parseRepositoryLookupError)
+		}
 	}
 
 	parseSmokeDirPath, createRunnerSmokeDirError := os.MkdirTemp("", "gogrpcbridge-publish-smoke-*")
@@ -270,10 +280,11 @@ func handleRunnerCanonicalPublishCheck(parseRunnerContext context.Context, parse
 		_ = os.RemoveAll(parseSmokeDirPath)
 	}()
 
-	if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseSmokeDirPath, nil, "go", "mod", "init", "example.com/gogrpcbridge-publish-smoke"); handleRunnerProcessError != nil {
+	storeRunnerCanonicalEnv := buildRunnerCanonicalEnv()
+	if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseSmokeDirPath, storeRunnerCanonicalEnv, "go", "mod", "init", "example.com/gogrpcbridge-publish-smoke"); handleRunnerProcessError != nil {
 		return handleRunnerProcessError
 	}
-	if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseSmokeDirPath, nil, "go", "get", parseRunnerCanonicalModulePath+"@latest"); handleRunnerProcessError != nil {
+	if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseSmokeDirPath, storeRunnerCanonicalEnv, "go", "get", parseRunnerCanonicalModulePath+"@latest"); handleRunnerProcessError != nil {
 		return fmt.Errorf(
 			"canonical publish check failed: clean-consumer go get for %q failed. publish a new semver tag from %q with matching module path %q: %w",
 			parseRunnerCanonicalModulePath,
@@ -282,19 +293,110 @@ func handleRunnerCanonicalPublishCheck(parseRunnerContext context.Context, parse
 			handleRunnerProcessError,
 		)
 	}
-
-	parseSmokeMainPath := filepath.Join(parseSmokeDirPath, "main.go")
-	parseSmokeMainContent := "package main\n\nimport _ \"" + parseRunnerCanonicalModulePath + "/pkg/grpctunnel\"\n\nfunc main() {}\n"
-	if storeRunnerSmokeMainError := os.WriteFile(parseSmokeMainPath, []byte(parseSmokeMainContent), 0o644); storeRunnerSmokeMainError != nil {
-		return fmt.Errorf("failed to write smoke main file %q: %w", parseSmokeMainPath, storeRunnerSmokeMainError)
+	if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseSmokeDirPath, storeRunnerCanonicalEnv, "go", "get", parseRunnerCanonicalModulePath+"/pkg/grpctunnel@latest"); handleRunnerProcessError != nil {
+		return fmt.Errorf(
+			"canonical publish check failed: clean-consumer package go get for %q failed: %w",
+			parseRunnerCanonicalModulePath+"/pkg/grpctunnel@latest",
+			handleRunnerProcessError,
+		)
 	}
 
-	if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseSmokeDirPath, nil, "go", "build", "."); handleRunnerProcessError != nil {
-		return fmt.Errorf("canonical publish check failed: clean-consumer compile smoke failed: %w", handleRunnerProcessError)
+	parseServerDirPath := filepath.Join(parseSmokeDirPath, "server")
+	if createRunnerServerDirectoryError := os.MkdirAll(parseServerDirPath, 0o755); createRunnerServerDirectoryError != nil {
+		return fmt.Errorf("failed to create smoke server directory %q: %w", parseServerDirPath, createRunnerServerDirectoryError)
+	}
+	parseSmokeBinPath := filepath.Join(parseSmokeDirPath, "bin")
+	if createRunnerSmokeBinDirectoryError := os.MkdirAll(parseSmokeBinPath, 0o755); createRunnerSmokeBinDirectoryError != nil {
+		return fmt.Errorf("failed to create smoke bin directory %q: %w", parseSmokeBinPath, createRunnerSmokeBinDirectoryError)
+	}
+	parseServerMainPath := filepath.Join(parseServerDirPath, "main.go")
+	parseServerMainContent := "package main\n\nimport _ \"" + parseRunnerCanonicalModulePath + "/pkg/grpctunnel\"\n\nfunc main() {}\n"
+	if storeRunnerServerMainError := os.WriteFile(parseServerMainPath, []byte(parseServerMainContent), 0o644); storeRunnerServerMainError != nil {
+		return fmt.Errorf("failed to write smoke server main file %q: %w", parseServerMainPath, storeRunnerServerMainError)
+	}
+	if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseSmokeDirPath, storeRunnerCanonicalEnv, "go", "build", "-o", filepath.Join("bin", "server-smoke"), "./server"); handleRunnerProcessError != nil {
+		return fmt.Errorf("canonical publish check failed: clean-consumer server compile smoke failed: %w", handleRunnerProcessError)
+	}
+
+	parseWASMDirPath := filepath.Join(parseSmokeDirPath, "wasm")
+	if createRunnerWASMDirectoryError := os.MkdirAll(parseWASMDirPath, 0o755); createRunnerWASMDirectoryError != nil {
+		return fmt.Errorf("failed to create smoke wasm directory %q: %w", parseWASMDirPath, createRunnerWASMDirectoryError)
+	}
+	parseWASMMainPath := filepath.Join(parseWASMDirPath, "main.go")
+	parseWASMMainContent := "//go:build js && wasm\n\npackage main\n\nimport _ \"" + parseRunnerCanonicalModulePath + "/pkg/grpctunnel\"\n\nfunc main() {}\n"
+	if storeRunnerWASMMainError := os.WriteFile(parseWASMMainPath, []byte(parseWASMMainContent), 0o644); storeRunnerWASMMainError != nil {
+		return fmt.Errorf("failed to write smoke wasm main file %q: %w", parseWASMMainPath, storeRunnerWASMMainError)
+	}
+	storeRunnerWASMEnv := buildRunnerCanonicalWASMEnv(storeRunnerCanonicalEnv)
+	if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseSmokeDirPath, storeRunnerWASMEnv, "go", "build", "-o", filepath.Join("bin", "wasm-smoke.wasm"), "./wasm"); handleRunnerProcessError != nil {
+		return fmt.Errorf("canonical publish check failed: clean-consumer wasm compile smoke failed: %w", handleRunnerProcessError)
 	}
 
 	_, _ = fmt.Fprintln(os.Stdout, "canonical publish check passed")
 	return nil
+}
+
+// buildRunnerCanonicalEnv builds optional environment overrides for canonical publish smoke commands.
+func buildRunnerCanonicalEnv() map[string]string {
+	parseRunnerCanonicalGoProxyValue := strings.TrimSpace(os.Getenv(parseRunnerCanonicalGoProxyEnvKey))
+	if parseRunnerCanonicalGoProxyValue == "" {
+		return nil
+	}
+
+	return map[string]string{
+		"GOPROXY": parseRunnerCanonicalGoProxyValue,
+	}
+}
+
+// buildRunnerCanonicalWASMEnv returns environment variables for wasm smoke builds.
+func buildRunnerCanonicalWASMEnv(storeRunnerCanonicalEnv map[string]string) map[string]string {
+	storeRunnerWASMEnv := map[string]string{
+		"GOOS":   "js",
+		"GOARCH": "wasm",
+	}
+	for parseKey, parseValue := range storeRunnerCanonicalEnv {
+		storeRunnerWASMEnv[parseKey] = parseValue
+	}
+	return storeRunnerWASMEnv
+}
+
+// buildRunnerCanonicalRepositoryURLs returns accepted repository URLs for identity checks.
+func buildRunnerCanonicalRepositoryURLs() []string {
+	storeRunnerCanonicalURLs := []string{
+		normalizeRunnerRepositoryURL(parseRunnerCanonicalRepositoryURL),
+		normalizeRunnerRepositoryURL(parseRunnerLegacyRepositoryURL),
+	}
+
+	storeRunnerUniqueURLs := make([]string, 0, len(storeRunnerCanonicalURLs))
+	storeRunnerSeenURLs := map[string]struct{}{}
+	for _, parseRepositoryURL := range storeRunnerCanonicalURLs {
+		if parseRepositoryURL == "" {
+			continue
+		}
+		if _, hasRunnerSeenURL := storeRunnerSeenURLs[parseRepositoryURL]; hasRunnerSeenURL {
+			continue
+		}
+		storeRunnerSeenURLs[parseRepositoryURL] = struct{}{}
+		storeRunnerUniqueURLs = append(storeRunnerUniqueURLs, parseRepositoryURL)
+	}
+	return storeRunnerUniqueURLs
+}
+
+// hasRunnerCanonicalRepositoryURL reports whether a repository URL is accepted for canonical checks.
+func hasRunnerCanonicalRepositoryURL(parseRepositoryURL string, storeRunnerCanonicalRepositoryURLs []string) bool {
+	parseRepositoryURL = normalizeRunnerRepositoryURL(parseRepositoryURL)
+	for _, parseAllowedURL := range storeRunnerCanonicalRepositoryURLs {
+		if parseRepositoryURL == parseAllowedURL {
+			return true
+		}
+	}
+	return false
+}
+
+// hasRunnerSkipCanonicalOriginCheck reports whether origin remote validation should be skipped.
+func hasRunnerSkipCanonicalOriginCheck() bool {
+	parseSkipOriginValue := strings.TrimSpace(strings.ToLower(os.Getenv(parseRunnerCanonicalSkipOriginEnvKey)))
+	return parseSkipOriginValue == "1" || parseSkipOriginValue == "true" || parseSkipOriginValue == "yes"
 }
 
 // parseRunnerGoModModulePath parses go.mod content and returns the declared module path.

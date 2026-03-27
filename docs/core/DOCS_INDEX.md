@@ -6,10 +6,13 @@ This is the fast navigation map for GoGRPCBridge docs.
 
 - Start here: [README.md Quick Start](./README.md#quick-start)
 - Build and validation commands: [README.md Development Runner](./README.md#development-runner)
+- Step-by-step execution checklist: [GETTING_STARTED_TODOS.md](./GETTING_STARTED_TODOS.md)
+- Production-oriented extension: [GETTING_STARTED_ADVANCED.md](./GETTING_STARTED_ADVANCED.md)
 
 ## API
 
 - Canonical API overview: [README.md Core API](./README.md#core-api-recommended)
+- Repository/module identity policy: [MODULE_IDENTITY.md](./MODULE_IDENTITY.md)
 - Compatibility and deprecation guarantees: [API_COMPATIBILITY.md](./API_COMPATIBILITY.md)
 - Examples catalog status: [examples/README.md](../examples/README.md)
 

@@ -1,10 +1,26 @@
 name: Auto Release
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Semver bump type when explicit_version is not provided"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      explicit_version:
+        description: "Optional explicit release tag (vX.Y.Z)"
+        required: false
+        type: string
+      dry_run:
+        description: "Resolve and validate release tag without pushing"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -14,101 +30,115 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  auto-release-guard:
-    name: Auto Release Guard
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Warn when push-based auto release is disabled
-      run: |
-        if [ "${{ github.event_name }}" = "push" ] && [ "${{ vars.GOGRPCBRIDGE_ENABLE_AUTO_RELEASE }}" != "true" ]; then
-          echo "::warning::Push-triggered auto release is disabled. Set repo variable GOGRPCBRIDGE_ENABLE_AUTO_RELEASE=true to enable it."
-        fi
-
-  # Run tests first - only release if they pass
   test:
     uses: ./.github/workflows/test.yml
-  
+
   auto-release:
-    name: Auto Increment Release
+    name: Create Intentional Release Tag
     runs-on: ubuntu-latest
     needs:
-      - auto-release-guard
-      - test  # Only run if tests pass
-    if: github.event_name == 'workflow_dispatch' || vars.GOGRPCBRIDGE_ENABLE_AUTO_RELEASE == 'true'
+      - test
     permissions:
       contents: write
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Get latest tag
-      id: get_latest_tag
-      run: |
-        # Get the latest tag, or default to v0.0.0 if no tags exist
-        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-        echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
-        echo "Latest tag: $LATEST_TAG"
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          set -euo pipefail
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "LATEST_TAG=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Latest tag: $LATEST_TAG"
 
-    - name: Calculate next version
-      id: next_version
-      run: |
-        LATEST="${{ steps.get_latest_tag.outputs.LATEST_TAG }}"
-        # Remove 'v' prefix
-        VERSION=${LATEST#v}
-        
-        # Split version into parts
-        IFS='.' read -r -a parts <<< "$VERSION"
-        MAJOR=${parts[0]}
-        MINOR=${parts[1]}
-        PATCH=${parts[2]}
-        
-        # Increment patch version
-        PATCH=$((PATCH + 1))
-        
-        NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-        echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "Next version: $NEW_VERSION"
+      - name: Resolve next version
+        id: next_version
+        run: |
+          set -euo pipefail
+          LATEST="${{ steps.get_latest_tag.outputs.LATEST_TAG }}"
+          EXPLICIT="${{ github.event.inputs.explicit_version }}"
+          RELEASE_TYPE="${{ github.event.inputs.release_type }}"
 
-    - name: Check if new commits since last tag
-      id: check_commits
-      run: |
-        LATEST_TAG="${{ steps.get_latest_tag.outputs.LATEST_TAG }}"
-        if [ "$LATEST_TAG" = "v0.0.0" ]; then
-          echo "HAS_NEW_COMMITS=true" >> $GITHUB_OUTPUT
-          echo "No tags exist, will create first release"
-        else
-          # Count commits since last tag
-          COMMIT_COUNT=$(git rev-list ${LATEST_TAG}..HEAD --count)
-          if [ "$COMMIT_COUNT" -gt 0 ]; then
-            echo "HAS_NEW_COMMITS=true" >> $GITHUB_OUTPUT
-            echo "Found $COMMIT_COUNT new commits since last tag"
+          if [ -n "$EXPLICIT" ]; then
+            if ! [[ "$EXPLICIT" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid explicit_version: $EXPLICIT (expected vX.Y.Z)"
+              exit 1
+            fi
+            NEW_VERSION="$EXPLICIT"
           else
-            echo "HAS_NEW_COMMITS=false" >> $GITHUB_OUTPUT
-            echo "No new commits since last tag"
+            VERSION="${LATEST#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+            case "$RELEASE_TYPE" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+              *)
+                echo "Unsupported release_type: $RELEASE_TYPE"
+                exit 1
+                ;;
+            esac
+            NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
           fi
-        fi
 
-    - name: Create and push new tag
-      if: steps.check_commits.outputs.HAS_NEW_COMMITS == 'true'
-      run: |
-        NEW_VERSION="${{ steps.next_version.outputs.NEW_VERSION }}"
-        
-        # Configure git
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        
-        # Create annotated tag
-        git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
-        
-        # Push tag to trigger release workflow
-        git push origin "$NEW_VERSION"
-        
-        echo "✅ Created and pushed tag: $NEW_VERSION"
+          if git rev-parse "$NEW_VERSION" >/dev/null 2>&1; then
+            echo "Tag already exists: $NEW_VERSION"
+            exit 1
+          fi
 
-    - name: Skip release
-      if: steps.check_commits.outputs.HAS_NEW_COMMITS == 'false'
-      run: echo "⏭️ No new commits since last release, skipping auto-release"
+          echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved next version: $NEW_VERSION"
+
+      - name: Check if new commits since last tag
+        id: check_commits
+        run: |
+          set -euo pipefail
+          LATEST_TAG="${{ steps.get_latest_tag.outputs.LATEST_TAG }}"
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            echo "HAS_NEW_COMMITS=true" >> "$GITHUB_OUTPUT"
+            echo "No tags exist, creating first release tag"
+            exit 0
+          fi
+
+          COMMIT_COUNT=$(git rev-list "${LATEST_TAG}..HEAD" --count)
+          if [ "$COMMIT_COUNT" -gt 0 ]; then
+            echo "HAS_NEW_COMMITS=true" >> "$GITHUB_OUTPUT"
+            echo "Found $COMMIT_COUNT new commits since $LATEST_TAG"
+          else
+            echo "HAS_NEW_COMMITS=false" >> "$GITHUB_OUTPUT"
+            echo "No new commits since $LATEST_TAG"
+          fi
+
+      - name: Stop when no new commits
+        if: steps.check_commits.outputs.HAS_NEW_COMMITS == 'false'
+        run: |
+          echo "No commits to release. Refusing to create a semver tag."
+          exit 1
+
+      - name: Create and push release tag
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          set -euo pipefail
+          NEW_VERSION="${{ steps.next_version.outputs.NEW_VERSION }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
+          git push origin "$NEW_VERSION"
+          echo "Created and pushed tag: $NEW_VERSION"
+
+      - name: Dry run summary
+        if: github.event.inputs.dry_run == 'true'
+        run: |
+          echo "Dry run complete. Candidate tag: ${{ steps.next_version.outputs.NEW_VERSION }}"

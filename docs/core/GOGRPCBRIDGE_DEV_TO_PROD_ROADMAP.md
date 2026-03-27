@@ -205,18 +205,22 @@ S10A.8 completion note (2026-03-27):
 
 ## S15 External Publishability and Release Trust
 
-- [ ] S15.1 Unify canonical public identity across repository name, `go.mod` module path, README install/import examples, and release metadata.
-- [ ] S15.2 Add clean-consumer proof lane in CI: temp module `go get @latest`, import `pkg/grpctunnel`, compile minimal server and wasm client.
-- [ ] S15.3 Add `pkg.go.dev` discoverability check to release verification and fail on unresolved canonical docs.
+- [x] S15.1 Publish explicit canonical identity policy across repository name, `go.mod` module path, README install/import examples, and release metadata checks.
+- [x] S15.2 Add clean-consumer proof lane in CI: temp module `go get @latest`, import `pkg/grpctunnel`, compile minimal server and wasm client.
+- [x] S15.3 Add `pkg.go.dev` discoverability check to release verification and fail on unresolved canonical docs.
 - [ ] S15.4 Verify GitHub Releases publication path end-to-end (tag -> workflow -> release entry -> attached artifacts).
-- [ ] S15.5 Replace blind auto-patch tagging with intentional semver policy (release-please, workflow dispatch, or PR-label bump rules).
+- [x] S15.5 Replace blind auto-patch tagging with intentional semver policy (release-please, workflow dispatch, or PR-label bump rules).
 - [ ] S15.6 Add release artifact signing/provenance (Cosign/Sigstore and/or SLSA provenance).
+
+S15.4 implementation note (2026-03-27):
+- Fixed release workflow changelog source path to `docs/core/CHANGELOG.md`, removing a direct in-repo failure path that prevented release publication.
+- End-to-end verification still requires the next tag-triggered release run in GitHub Actions.
 
 ## S16 CI Source of Truth and Internet-Facing Hardening
 
-- [ ] S16.1 Keep `test.yml` as canonical quality gate and demote/remove overlapping `build.yml` behavior.
-- [ ] S16.2 Align security lanes between normal CI and release CI (include `govulncheck` in normal CI path).
-- [ ] S16.3 Publish explicit deployment profiles: local/dev, trusted-internal, and internet-facing reverse-proxied production.
+- [x] S16.1 Keep `test.yml` as canonical quality gate and demote/remove overlapping `build.yml` behavior.
+- [x] S16.2 Align security lanes between normal CI and release CI (include `govulncheck` in normal CI path).
+- [x] S16.3 Publish explicit deployment profiles: local/dev, trusted-internal, and internet-facing reverse-proxied production.
 - [ ] S16.4 Enforce code-level abuse controls: handshake timeout, frame limits, stream/tunnel caps, idle timeout, origin allowlist policy, auth-before-upgrade hook.
 - [ ] S16.5 Expand resilience test suite with reconnect storms, slow-consumer pressure, half-open sockets, reverse-proxy disconnects, and tab suspend/resume.
 
@@ -490,3 +494,43 @@ S10A.8 completion note (2026-03-27):
   - Local submodule branch contains additional unpublished local commit/worktree state not required for this blocker fix; keep release/tag operations pinned to known-good commit lineage.
 - next suggested todo:
   - Run and merge the remaining intended submodule local changes separately from release-critical module-path publication work.
+
+### Checkpoint 2026-03-27L
+
+- completed todo:
+  - S15.1 Publish explicit module/repository identity policy and align docs/checks.
+  - S15.2 Add CI clean-consumer proof lane that validates `go get`, server compile, and WASM compile.
+  - S15.3 Add `pkg.go.dev` discoverability check to release validation.
+  - S15.5 Replace blind auto patch tagging with intentional workflow-dispatch semver tagging.
+  - S16.1 Demote overlapping `build.yml` and keep `test.yml` as the canonical quality gate.
+  - S16.2 Align normal/release security lanes and Go toolchain baseline to 1.25.x.
+  - S16.3 Publish explicit deployment profile guidance in getting-started advanced docs.
+- files changed:
+  - `third_party/GoGRPCBridge/.github/workflows/auto-release.yml`
+  - `third_party/GoGRPCBridge/.github/workflows/build.yml`
+  - `third_party/GoGRPCBridge/.github/workflows/release.yml`
+  - `third_party/GoGRPCBridge/.github/workflows/test.yml`
+  - `third_party/GoGRPCBridge/tools/runner.go`
+  - `third_party/GoGRPCBridge/tools/runner_publish_test.go`
+  - `third_party/GoGRPCBridge/README.md`
+  - `third_party/GoGRPCBridge/docs/core/MODULE_IDENTITY.md`
+  - `third_party/GoGRPCBridge/docs/core/DOCS_INDEX.md`
+  - `third_party/GoGRPCBridge/docs/catalog.json`
+  - `third_party/GoGRPCBridge/docs/core/CHANGELOG.md`
+  - `third_party/GoGRPCBridge/docs/core/GOGRPCBRIDGE_DEV_TO_PROD_ROADMAP.md`
+- validation run:
+  - `go test ./tools -count=1` (from `third_party/GoGRPCBridge`)
+  - `RUNNER_CANONICAL_SKIP_ORIGIN=1 RUNNER_CANONICAL_GOPROXY=direct go run ./tools/runner.go canonical-publish-check` (from `third_party/GoGRPCBridge`)
+  - `RUNNER_CANONICAL_GOPROXY=direct go run ./tools/runner.go canonical-publish-check` (from `third_party/GoGRPCBridge`)
+  - focused markdown link checks for updated docs (`README.md`, `docs/core/DOCS_INDEX.md`, `docs/core/MODULE_IDENTITY.md`)
+- result:
+  - Canonical identity guidance is now explicit and documented as a compatibility policy.
+  - CI now runs canonical consumer smoke checks in normal test lanes (fork-safe origin mode) and release lanes.
+  - Canonical publish smoke now verifies tiny server and tiny WASM compile targets, not import-only checks.
+  - Release flow no longer depends on non-existent root `CHANGELOG.md`, and auto-release no longer creates blind patch tags on every push.
+- residual risk:
+  - End-to-end release publication still requires a real tag run in GitHub Actions to fully close S15.4.
+  - Artifact signing/provenance (S15.6) is still open.
+  - Module path remains intentionally `github.com/monstercameron/grpc-tunnel`; renaming would be a public breaking change.
+- next suggested todo:
+  - S15.4 Trigger a controlled tag release and verify release visibility/artifact upload end to end.

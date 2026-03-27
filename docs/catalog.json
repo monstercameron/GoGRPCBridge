@@ -65,6 +65,16 @@
         "section":  "Core"
     },
     {
+        "path":  "core/GETTING_STARTED_ADVANCED.md",
+        "title":  "Getting Started Advanced",
+        "section":  "Core"
+    },
+    {
+        "path":  "core/GETTING_STARTED_TODOS.md",
+        "title":  "Getting Started Todos",
+        "section":  "Core"
+    },
+    {
         "path":  "core/GOGRPCBRIDGE_DEV_TO_PROD_ROADMAP.md",
         "title":  "Gogrpcbridge Dev To Prod Roadmap",
         "section":  "Core"
@@ -92,6 +102,11 @@
     {
         "path":  "core/MIGRATION.md",
         "title":  "Migration",
+        "section":  "Core"
+    },
+    {
+        "path":  "core/MODULE_IDENTITY.md",
+        "title":  "Module Identity",
         "section":  "Core"
     },
     {

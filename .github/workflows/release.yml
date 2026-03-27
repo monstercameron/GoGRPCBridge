@@ -11,6 +11,7 @@ permissions:
 env:
   GOSEC_VERSION: v2.25.0
   GOVULNCHECK_VERSION: v1.1.4
+  CHANGELOG_PATH: docs/core/CHANGELOG.md
 
 jobs:
   release:
@@ -39,8 +40,8 @@ jobs:
       - name: Validate changelog entry exists for tag
         run: |
           VERSION="${{ steps.version.outputs.value }}"
-          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
-            echo "Missing CHANGELOG section for $VERSION"
+          if ! grep -q "^## \[$VERSION\]" "${CHANGELOG_PATH}"; then
+            echo "Missing changelog section for $VERSION in ${CHANGELOG_PATH}"
             exit 1
           fi
 
@@ -51,7 +52,7 @@ jobs:
             $0 ~ "^## \\[" version "\\]" { capture=1; next }
             $0 ~ "^## \\[" && capture { capture=0 }
             capture { print }
-          ' version="$VERSION" CHANGELOG.md > RELEASE_NOTES.md
+          ' version="$VERSION" "${CHANGELOG_PATH}" > RELEASE_NOTES.md
           if [ ! -s RELEASE_NOTES.md ]; then
             echo "No release notes extracted for $VERSION"
             exit 1
@@ -64,6 +65,31 @@ jobs:
 
       - name: Run canonical publish identity check
         run: go run ./tools/runner.go canonical-publish-check
+        env:
+          RUNNER_CANONICAL_GOPROXY: direct
+
+      - name: Verify pkg.go.dev discoverability
+        run: |
+          MODULE_PATH="github.com/monstercameron/grpc-tunnel"
+          MODULE_URL="https://pkg.go.dev/${MODULE_PATH}"
+          PACKAGE_URL="https://pkg.go.dev/${MODULE_PATH}/pkg/grpctunnel"
+
+          check_url() {
+            local url="$1"
+            for attempt in 1 2 3 4 5 6; do
+              status=$(curl -sS -o /dev/null -w "%{http_code}" "$url" || echo "000")
+              if [ "$status" -ge 200 ] && [ "$status" -lt 400 ]; then
+                return 0
+              fi
+              echo "pkg.go.dev check retry ${attempt}/6 for ${url}, status=${status}"
+              sleep 10
+            done
+            echo "pkg.go.dev discoverability check failed for ${url}"
+            return 1
+          }
+
+          check_url "$MODULE_URL"
+          check_url "$PACKAGE_URL"
 
       - name: Run API governance guard
         run: go run ./tools/api_compat_guard check
