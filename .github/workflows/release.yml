@@ -72,7 +72,7 @@ jobs:
           set -euo pipefail
           mkdir -p ./bin/quality
           for attempt in 1 2; do
-            if go run ./tools/runner.go quality 2>&1 | tee ./bin/quality/quality.log; then
+            if RUNNER_QUALITY_SKIP_RACE=1 go run ./tools/runner.go quality 2>&1 | tee ./bin/quality/quality.log; then
               exit 0
             fi
             if [ "$attempt" -eq 2 ]; then

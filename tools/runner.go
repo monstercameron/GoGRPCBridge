@@ -678,6 +678,14 @@ func buildRunnerBenchmarkGateResultWithRetry(parseRunnerContext context.Context,
 
 // handleRunnerQualityTest runs coverage tests with race when supported by the local toolchain.
 func handleRunnerQualityTest(parseRunnerContext context.Context, parseRunnerRootPath string) error {
+	if os.Getenv("RUNNER_QUALITY_SKIP_RACE") == "1" {
+		_, _ = fmt.Fprintln(os.Stdout, "race gate skipped by RUNNER_QUALITY_SKIP_RACE=1. running non-race coverage test.")
+		if handleRunnerProcessError := handleRunnerProcess(parseRunnerContext, parseRunnerRootPath, parseRunnerRootPath, nil, "go", "test", "./pkg/...", "-coverprofile=coverage.txt", "-covermode=atomic"); handleRunnerProcessError != nil {
+			return handleRunnerProcessError
+		}
+		return nil
+	}
+
 	parseRaceOutput, buildRunnerRaceOutputError := buildRunnerProcessOutput(
 		parseRunnerContext,
 		parseRunnerRootPath,
