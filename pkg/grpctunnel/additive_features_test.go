@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/monstercameron/grpc-tunnel/examples/_shared/proto"
+	"github.com/monstercameron/GoGRPCBridge/examples/_shared/proto"
 	"google.golang.org/grpc"
 	grpc_health_v1 "google.golang.org/grpc/health/grpc_health_v1"
 )

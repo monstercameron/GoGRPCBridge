@@ -1,4 +1,4 @@
-module github.com/monstercameron/grpc-tunnel
+module github.com/monstercameron/GoGRPCBridge
 
 go 1.25
 

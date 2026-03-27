@@ -144,13 +144,13 @@ This impacts GC pressure in high-throughput scenarios.
 
 ```bash
 # Run all benchmarks
-go test github.com/monstercameron/grpc-tunnel/benchmarks -bench=Benchmark -benchtime=3s -benchmem
+go test github.com/monstercameron/GoGRPCBridge/benchmarks -bench=Benchmark -benchtime=3s -benchmem
 
 # Run specific benchmark
-go test github.com/monstercameron/grpc-tunnel/benchmarks -bench=BenchmarkGRPC_CreateTodo -benchtime=3s
+go test github.com/monstercameron/GoGRPCBridge/benchmarks -bench=BenchmarkGRPC_CreateTodo -benchtime=3s
 
 # Compare payload sizes
-go test github.com/monstercameron/grpc-tunnel/benchmarks -bench=PayloadSize -benchtime=3s
+go test github.com/monstercameron/GoGRPCBridge/benchmarks -bench=PayloadSize -benchtime=3s
 ```
 
 ---

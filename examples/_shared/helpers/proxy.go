@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/monstercameron/grpc-tunnel/pkg/bridge"
+	"github.com/monstercameron/GoGRPCBridge/pkg/bridge"
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/http2"

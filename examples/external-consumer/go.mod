@@ -1,9 +1,9 @@
 module example.com/gogrpcbridge-external-consumer
 
-go 1.24
+go 1.25
 
 require (
-	github.com/monstercameron/grpc-tunnel v0.0.10
+	github.com/monstercameron/GoGRPCBridge v0.0.10
 	google.golang.org/grpc v1.69.2
 )
 

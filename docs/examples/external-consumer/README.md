@@ -2,7 +2,7 @@
 
 This example is a standalone Go module that imports:
 
-- `github.com/monstercameron/grpc-tunnel/pkg/grpctunnel`
+- `github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel`
 
 without any local `replace` directives.
 

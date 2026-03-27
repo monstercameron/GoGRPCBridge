@@ -4,10 +4,10 @@
 
 Modern web development shouldn't force you to choose between developer experience and browser compatibility. GoGRPCBridge brings the full power of gRPC over WebSocket transport to WebAssembly clients and standard Go clients.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/monstercameron/grpc-tunnel.svg)](https://pkg.go.dev/github.com/monstercameron/grpc-tunnel)
-[![Go Report Card](https://goreportcard.com/badge/github.com/monstercameron/grpc-tunnel)](https://goreportcard.com/report/github.com/monstercameron/grpc-tunnel)
-[![Build](https://github.com/monstercameron/grpc-tunnel/workflows/Build/badge.svg)](https://github.com/monstercameron/grpc-tunnel/actions/workflows/build.yml)
-[![Test](https://github.com/monstercameron/grpc-tunnel/workflows/Test/badge.svg)](https://github.com/monstercameron/grpc-tunnel/actions/workflows/test.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/monstercameron/GoGRPCBridge.svg)](https://pkg.go.dev/github.com/monstercameron/GoGRPCBridge)
+[![Go Report Card](https://goreportcard.com/badge/github.com/monstercameron/GoGRPCBridge)](https://goreportcard.com/report/github.com/monstercameron/GoGRPCBridge)
+[![Build](https://github.com/monstercameron/GoGRPCBridge/workflows/Build/badge.svg)](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/build.yml)
+[![Test](https://github.com/monstercameron/GoGRPCBridge/workflows/Test/badge.svg)](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go)](https://go.dev/)
 
@@ -68,7 +68,7 @@ Browsers do not expose raw TCP/HTTP2 sockets for native gRPC clients. GoGRPCBrid
 ## Install
 
 ```bash
-go get github.com/monstercameron/grpc-tunnel
+go get github.com/monstercameron/GoGRPCBridge
 ```
 
 Requirements:
@@ -91,7 +91,7 @@ import (
     "log"
     "net/http"
 
-    "github.com/monstercameron/grpc-tunnel/pkg/grpctunnel"
+    "github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
     "google.golang.org/grpc"
 )
 
@@ -121,7 +121,7 @@ import (
     "log"
 
     examplepb "github.com/your-org/your-project/gen/example"
-    "github.com/monstercameron/grpc-tunnel/pkg/grpctunnel"
+    "github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 )
 
 func main() {
@@ -324,5 +324,5 @@ MIT. See [LICENSE](../../LICENSE).
 
 ## Support
 
-- Issues: https://github.com/monstercameron/grpc-tunnel/issues
-- Discussions: https://github.com/monstercameron/grpc-tunnel/discussions
+- Issues: https://github.com/monstercameron/GoGRPCBridge/issues
+- Discussions: https://github.com/monstercameron/GoGRPCBridge/discussions

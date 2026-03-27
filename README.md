@@ -2,7 +2,7 @@
 
 Native gRPC in the browser using WebSocket transport, without rewriting your service contracts.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/monstercameron/grpc-tunnel.svg)](https://pkg.go.dev/github.com/monstercameron/grpc-tunnel)
+[![Go Reference](https://pkg.go.dev/badge/github.com/monstercameron/GoGRPCBridge.svg)](https://pkg.go.dev/github.com/monstercameron/GoGRPCBridge)
 [![Test](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/test.yml/badge.svg)](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/test.yml)
 [![Release](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/release.yml/badge.svg)](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -29,7 +29,7 @@ The project keeps your protobuf and generated client/server contracts intact. It
 ## Install
 
 ```bash
-go get github.com/monstercameron/grpc-tunnel@latest
+go get github.com/monstercameron/GoGRPCBridge@latest
 ```
 
 Requires Go 1.25+ (see `go.mod` toolchain requirements).
@@ -37,9 +37,9 @@ Requires Go 1.25+ (see `go.mod` toolchain requirements).
 ## Module Identity
 
 - GitHub repository: `github.com/monstercameron/GoGRPCBridge`
-- Canonical Go module path: `github.com/monstercameron/grpc-tunnel`
+- Canonical Go module path: `github.com/monstercameron/GoGRPCBridge`
 
-The module path remains `github.com/monstercameron/grpc-tunnel` for consumer compatibility and existing `go get` installs. Use the module path for imports and `go get`, and use `GoGRPCBridge` as the project/repository name.
+The module path remains `github.com/monstercameron/GoGRPCBridge` for consumer compatibility and existing `go get` installs. Use the module path for imports and `go get`, and use `GoGRPCBridge` as the project/repository name.
 
 ## Show, Not Tell: Minimal Integration
 
@@ -53,7 +53,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/monstercameron/grpc-tunnel/pkg/grpctunnel"
+	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 	"google.golang.org/grpc"
 )
 
@@ -100,7 +100,7 @@ import (
 	"time"
 
 	pb "github.com/your-org/your-proto/gen"
-	"github.com/monstercameron/grpc-tunnel/pkg/grpctunnel"
+	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 )
 
 func main() {
@@ -159,7 +159,7 @@ go run ./tools/runner.go quality-trend
 go run ./tools/runner.go canonical-publish-check
 ```
 
-`canonical-publish-check` verifies module path alignment, accepted repository identity (`GoGRPCBridge` plus legacy module repository URL), and a clean-consumer `go get` + compile smoke test.
+`canonical-publish-check` verifies module path alignment, canonical repository identity (`GoGRPCBridge`), and a clean-consumer `go get` + compile smoke test.
 
 Release workflow also enforces:
 

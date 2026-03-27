@@ -4,7 +4,7 @@ go 1.25
 
 replace grpc-tunnel => ../../
 
-require github.com/monstercameron/grpc-tunnel v0.0.0-00010101000000-000000000000
+require github.com/monstercameron/GoGRPCBridge v0.0.0-00010101000000-000000000000
 
 require (
 	github.com/gorilla/websocket v1.5.3 // indirect
@@ -16,4 +16,4 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 )
 
-replace github.com/monstercameron/grpc-tunnel => ../../
+replace github.com/monstercameron/GoGRPCBridge => ../../

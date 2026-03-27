@@ -1,6 +1,6 @@
 # API Compatibility and Deprecation Policy
 
-This policy defines compatibility guarantees for `github.com/monstercameron/grpc-tunnel`.
+This policy defines compatibility guarantees for `github.com/monstercameron/GoGRPCBridge`.
 
 ## Scope
 

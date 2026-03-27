@@ -4,7 +4,7 @@
 
 ```bash
 # Clone the repo
-git clone https://github.com/monstercameron/grpc-tunnel.git
+git clone https://github.com/monstercameron/GoGRPCBridge.git
 cd GoGRPCBridge
 
 # Install golangci-lint (if not already installed)
@@ -92,7 +92,7 @@ When you open a pull request or push bridge-related changes, GitHub Actions runs
 3. **WASM Compile** - js/wasm compile coverage for tunnel packages
 4. **Browser Lane** - end-to-end browser coverage (full gate)
 5. **Security Scan** - gosec + govulncheck with fail-on-severity policy
-6. **Go-Get Smoke** - clean consumer `go get github.com/monstercameron/grpc-tunnel@latest`
+6. **Go-Get Smoke** - clean consumer `go get github.com/monstercameron/GoGRPCBridge@latest`
 
 ### Release Policy
 

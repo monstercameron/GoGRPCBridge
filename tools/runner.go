@@ -24,9 +24,8 @@ type storeRunnerCommand struct {
 	getRunnerDescription string
 }
 
-const parseRunnerCanonicalModulePath = "github.com/monstercameron/grpc-tunnel"
+const parseRunnerCanonicalModulePath = "github.com/monstercameron/GoGRPCBridge"
 const parseRunnerCanonicalRepositoryURL = "https://github.com/monstercameron/GoGRPCBridge"
-const parseRunnerLegacyRepositoryURL = "https://github.com/monstercameron/grpc-tunnel"
 const parseRunnerCanonicalGoProxyEnvKey = "RUNNER_CANONICAL_GOPROXY"
 const parseRunnerCanonicalSkipOriginEnvKey = "RUNNER_CANONICAL_SKIP_ORIGIN"
 
@@ -362,24 +361,11 @@ func buildRunnerCanonicalWASMEnv(storeRunnerCanonicalEnv map[string]string) map[
 
 // buildRunnerCanonicalRepositoryURLs returns accepted repository URLs for identity checks.
 func buildRunnerCanonicalRepositoryURLs() []string {
-	storeRunnerCanonicalURLs := []string{
-		normalizeRunnerRepositoryURL(parseRunnerCanonicalRepositoryURL),
-		normalizeRunnerRepositoryURL(parseRunnerLegacyRepositoryURL),
+	parseRepositoryURL := normalizeRunnerRepositoryURL(parseRunnerCanonicalRepositoryURL)
+	if parseRepositoryURL == "" {
+		return nil
 	}
-
-	storeRunnerUniqueURLs := make([]string, 0, len(storeRunnerCanonicalURLs))
-	storeRunnerSeenURLs := map[string]struct{}{}
-	for _, parseRepositoryURL := range storeRunnerCanonicalURLs {
-		if parseRepositoryURL == "" {
-			continue
-		}
-		if _, hasRunnerSeenURL := storeRunnerSeenURLs[parseRepositoryURL]; hasRunnerSeenURL {
-			continue
-		}
-		storeRunnerSeenURLs[parseRepositoryURL] = struct{}{}
-		storeRunnerUniqueURLs = append(storeRunnerUniqueURLs, parseRepositoryURL)
-	}
-	return storeRunnerUniqueURLs
+	return []string{parseRepositoryURL}
 }
 
 // hasRunnerCanonicalRepositoryURL reports whether a repository URL is accepted for canonical checks.

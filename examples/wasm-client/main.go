@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/monstercameron/grpc-tunnel/examples/_shared/proto"
-	"github.com/monstercameron/grpc-tunnel/pkg/grpctunnel"
+	"github.com/monstercameron/GoGRPCBridge/examples/_shared/proto"
+	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 )
 
 func main() {

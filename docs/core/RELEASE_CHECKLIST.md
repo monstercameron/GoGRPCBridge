@@ -9,7 +9,7 @@ Use this checklist before creating or publishing a release tag.
 - [ ] `go run ./tools/api_compat_guard check` passed.
 - [ ] `go run ./tools/runner.go canonical-publish-check` passed.
 - [ ] Required CI lanes passed (`lint`, `unit`, `wasm`, `browser`, integration smoke, full gate where applicable).
-- [ ] Canonical clean-consumer smoke passes: `go mod init <tmp> && go get github.com/monstercameron/grpc-tunnel@latest`.
+- [ ] Canonical clean-consumer smoke passes: `go mod init <tmp> && go get github.com/monstercameron/GoGRPCBridge@latest`.
 
 ## Documentation
 

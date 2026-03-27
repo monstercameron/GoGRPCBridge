@@ -103,26 +103,26 @@ Production-ready exit gates:
 
 - [x] S10.1 Create release checklist (quality, docs, performance, security, migration).
 - [x] S10.2 Ensure tags, changelog, and release assets are produced consistently.
-- [x] S10.3 Verify `go get github.com/monstercameron/grpc-tunnel@latest` works from a clean consumer module.
+- [x] S10.3 Verify `go get github.com/monstercameron/GoGRPCBridge@latest` works from a clean consumer module.
 - [x] S10.4 Verify `pkg.go.dev` docs are complete and canonical.
 - [x] S10.5 Add rollback and hotfix process.
 
 S10.3 blocker note (2026-03-27):
 - Clean-module verification still fails because the current published `@latest` (`v0.0.10`) declares module path `github.com/monstercameron/GoGRPCBridge`.
-- Repository/module source now aligns to `github.com/monstercameron/grpc-tunnel`; publish a new semver tag from this aligned state to clear the blocker.
+- Repository/module source now aligns to `github.com/monstercameron/GoGRPCBridge`; publish a new semver tag from this aligned state to clear the blocker.
 
 S10.4 blocker note (2026-03-27):
-- `pkg.go.dev` canonical verification is coupled to the same publish state; once a new aligned tag is published from `github.com/monstercameron/grpc-tunnel`, canonical docs should resolve.
+- `pkg.go.dev` canonical verification is coupled to the same publish state; once a new aligned tag is published from `github.com/monstercameron/GoGRPCBridge`, canonical docs should resolve.
 
 S10.3 completion note (2026-03-27):
-- Published canonical repository `main` update and semver tag `v0.0.11` on `github.com/monstercameron/grpc-tunnel`.
+- Published canonical repository `main` update and semver tag `v0.0.11` on `github.com/monstercameron/GoGRPCBridge`.
 - Clean-consumer smoke now passes:
   - `go mod init example.com/default2`
-  - `go get github.com/monstercameron/grpc-tunnel@latest`
+  - `go get github.com/monstercameron/GoGRPCBridge@latest`
   - resolved module version: `v0.0.11`.
 
 S10.4 completion note (2026-03-27):
-- `pkg.go.dev` canonical page resolves for `github.com/monstercameron/grpc-tunnel`.
+- `pkg.go.dev` canonical page resolves for `github.com/monstercameron/GoGRPCBridge`.
 - Observed version and package surface:
   - `v0.0.11` shown on page
   - canonical package docs include `pkg/grpctunnel`.
@@ -130,32 +130,32 @@ S10.4 completion note (2026-03-27):
 ## S10A Go-Get Readiness Checks
 
 - [x] S10A.1 Run module-path and repository-alignment check (`go.mod` path, git remote, and published module metadata).
-- [x] S10A.2 Publish and maintain a canonical repository at `github.com/monstercameron/grpc-tunnel` that serves the module path declared in `go.mod`.
-- [x] S10A.3 Ensure semver tags are created on the canonical repository and resolve through module proxy as `github.com/monstercameron/grpc-tunnel@vX.Y.Z`.
-- [x] S10A.4 Pass clean-consumer smoke test: `go mod init <tmp> && go get github.com/monstercameron/grpc-tunnel@latest`.
-- [x] S10A.5 Pass clean-consumer compile test by importing `github.com/monstercameron/grpc-tunnel/pkg/grpctunnel` with no `replace`.
-- [x] S10A.6 Verify `pkg.go.dev` canonical page for `github.com/monstercameron/grpc-tunnel` renders package docs and latest version.
+- [x] S10A.2 Publish and maintain a canonical repository at `github.com/monstercameron/GoGRPCBridge` that serves the module path declared in `go.mod`.
+- [x] S10A.3 Ensure semver tags are created on the canonical repository and resolve through module proxy as `github.com/monstercameron/GoGRPCBridge@vX.Y.Z`.
+- [x] S10A.4 Pass clean-consumer smoke test: `go mod init <tmp> && go get github.com/monstercameron/GoGRPCBridge@latest`.
+- [x] S10A.5 Pass clean-consumer compile test by importing `github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel` with no `replace`.
+- [x] S10A.6 Verify `pkg.go.dev` canonical page for `github.com/monstercameron/GoGRPCBridge` renders package docs and latest version.
 - [x] S10A.7 Add CI gate that fails when the clean-consumer `go get` smoke test fails.
 - [x] S10A.8 Add canonical publish-identity preflight command and enforce it in release automation.
 
 S10A analysis snapshot (2026-03-27):
-- `third_party/GoGRPCBridge/go.mod` declares `module github.com/monstercameron/grpc-tunnel`.
-- `git -C third_party/GoGRPCBridge remote -v` still points to `https://github.com/monstercameron/grpc-tunnel`.
-- `go list -m -json github.com/monstercameron/grpc-tunnel@latest` resolves `v0.0.10`, but `go get github.com/monstercameron/grpc-tunnel@latest` fails because that tag declares path `github.com/monstercameron/GoGRPCBridge`.
+- `third_party/GoGRPCBridge/go.mod` declares `module github.com/monstercameron/GoGRPCBridge`.
+- `git -C third_party/GoGRPCBridge remote -v` still points to `https://github.com/monstercameron/GoGRPCBridge`.
+- `go list -m -json github.com/monstercameron/GoGRPCBridge@latest` resolves `v0.0.10`, but `go get github.com/monstercameron/GoGRPCBridge@latest` fails because that tag declares path `github.com/monstercameron/GoGRPCBridge`.
 - Clean consumer run:
   - `go mod init example.com/verify`
-  - `go get github.com/monstercameron/grpc-tunnel@latest`
+  - `go get github.com/monstercameron/GoGRPCBridge@latest`
   - Failure: module path mismatch against `github.com/monstercameron/GoGRPCBridge` in `v0.0.10`.
 - Conclusion: source alignment is fixed in-repo, but this project is not yet go-get ready until a new semver tag is published with the aligned module path.
 
 S10A verification snapshot (2026-03-27):
-- Published `v0.0.11` tag on canonical repository `github.com/monstercameron/grpc-tunnel` from aligned module-path state.
+- Published `v0.0.11` tag on canonical repository `github.com/monstercameron/GoGRPCBridge` from aligned module-path state.
 - Proxy endpoint now resolves canonical latest:
-  - `https://proxy.golang.org/github.com/monstercameron/grpc-tunnel/@latest` -> `v0.0.11`.
+  - `https://proxy.golang.org/github.com/monstercameron/GoGRPCBridge/@latest` -> `v0.0.11`.
 - Clean consumer smoke now passes:
   - `go mod init example.com/default2`
-  - `go get github.com/monstercameron/grpc-tunnel@latest`
-  - resolved `github.com/monstercameron/grpc-tunnel v0.0.11`.
+  - `go get github.com/monstercameron/GoGRPCBridge@latest`
+  - resolved `github.com/monstercameron/GoGRPCBridge v0.0.11`.
 - `pkg.go.dev` resolves canonical module page with `v0.0.11` and `grpctunnel` package docs.
 
 S10A.7 completion note (2026-03-27):
@@ -163,9 +163,9 @@ S10A.7 completion note (2026-03-27):
 
 S10A.8 completion note (2026-03-27):
 - Added `go run ./tools/runner.go canonical-publish-check` to validate:
-  - local `go.mod` module path matches canonical target (`github.com/monstercameron/grpc-tunnel`)
+  - local `go.mod` module path matches canonical target (`github.com/monstercameron/GoGRPCBridge`)
   - git `origin` remote matches canonical repository URL
-  - clean-consumer `go get github.com/monstercameron/grpc-tunnel@latest` plus import compile smoke passes
+  - clean-consumer `go get github.com/monstercameron/GoGRPCBridge@latest` plus import compile smoke passes
 - Wired canonical publish check into `third_party/GoGRPCBridge/.github/workflows/release.yml` so release tags fail fast when publishing identity is broken.
 
 ## S11 Production Operations
@@ -431,7 +431,7 @@ S15.4 implementation note (2026-03-27):
 ### Checkpoint 2026-03-26J
 
 - completed todo:
-  - Resolve repository/module-path mismatch in-source by aligning module path and import surface to `github.com/monstercameron/grpc-tunnel`.
+  - Resolve repository/module-path mismatch in-source by aligning module path and import surface to `github.com/monstercameron/GoGRPCBridge`.
   - Advance S10A.2 (canonical repository and declared module path alignment) to complete.
 - files changed:
   - `third_party/GoGRPCBridge/go.mod`
@@ -451,27 +451,27 @@ S15.4 implementation note (2026-03-27):
   - `third_party/GoGRPCBridge/examples/_shared/proto/todos_grpc.pb.go`
   - `docs/GOGRPCBRIDGE_DEV_TO_PROD_ROADMAP.md`
 - validation run:
-  - `go list -m github.com/monstercameron/grpc-tunnel` (from repo root)
+  - `go list -m github.com/monstercameron/GoGRPCBridge` (from repo root)
   - `go test ./examples/100-ai-chat-wizard/client/app -run TestDoesNotExist -count=1` (from repo root)
   - `go test ./examples/100-ai-chat-wizard/server/app -run TestTransportHelpersCoverTunnelAndWasmResolution -count=1` (from repo root)
   - `go run ./tools/api_compat_guard check` (from `third_party/GoGRPCBridge`)
   - `go run ./tools/runner.go quality` (from `third_party/GoGRPCBridge`)
   - `go run ./tools/runner.go quality-trend` (from `third_party/GoGRPCBridge`)
-  - clean-consumer remote smoke: `go mod init example.com/verify && go get github.com/monstercameron/grpc-tunnel@latest`
+  - clean-consumer remote smoke: `go mod init example.com/verify && go get github.com/monstercameron/GoGRPCBridge@latest`
 - result:
-  - Module path mismatch is fixed in source and all imports/docs/workflows now target `github.com/monstercameron/grpc-tunnel`.
+  - Module path mismatch is fixed in source and all imports/docs/workflows now target `github.com/monstercameron/GoGRPCBridge`.
   - Submodule quality and governance gates pass with the aligned module path.
   - External `@latest` smoke still fails on published tag `v0.0.10` because it was cut before this alignment.
 - residual risk:
   - S10.3/S10A.3/S10A.4/S10A.5/S10A.6 remain blocked until a new semver tag is published from this aligned state.
 - next suggested todo:
-  - Publish the next semver tag from `github.com/monstercameron/grpc-tunnel`, then rerun clean-consumer `go get` and pkg.go.dev verification.
+  - Publish the next semver tag from `github.com/monstercameron/GoGRPCBridge`, then rerun clean-consumer `go get` and pkg.go.dev verification.
 
 ### Checkpoint 2026-03-27K
 
 - completed todo:
-  - S10.3 Verify clean-consumer `go get github.com/monstercameron/grpc-tunnel@latest`.
-  - S10.4 Verify canonical `pkg.go.dev` docs surface for `github.com/monstercameron/grpc-tunnel`.
+  - S10.3 Verify clean-consumer `go get github.com/monstercameron/GoGRPCBridge@latest`.
+  - S10.4 Verify canonical `pkg.go.dev` docs surface for `github.com/monstercameron/GoGRPCBridge`.
   - S10A.3 through S10A.6 (canonical tag publish plus proxy, smoke, compile, and docs verification).
 - files changed:
   - `docs/GOGRPCBRIDGE_DEV_TO_PROD_ROADMAP.md`
@@ -481,14 +481,14 @@ S15.4 implementation note (2026-03-27):
   - `git -C third_party/GoGRPCBridge push origin refs/tags/v0.0.11`
   - clean-consumer smoke:
     - `go mod init example.com/default2`
-    - `go get github.com/monstercameron/grpc-tunnel@latest`
-    - observed: `github.com/monstercameron/grpc-tunnel v0.0.11`
-  - `go list -m -json github.com/monstercameron/grpc-tunnel@latest` (returns `v0.0.11`)
-  - `https://proxy.golang.org/github.com/monstercameron/grpc-tunnel/@latest` (returns `v0.0.11`)
-  - `https://pkg.go.dev/github.com/monstercameron/grpc-tunnel?tab=doc` (shows `v0.0.11` and `grpctunnel` docs)
+    - `go get github.com/monstercameron/GoGRPCBridge@latest`
+    - observed: `github.com/monstercameron/GoGRPCBridge v0.0.11`
+  - `go list -m -json github.com/monstercameron/GoGRPCBridge@latest` (returns `v0.0.11`)
+  - `https://proxy.golang.org/github.com/monstercameron/GoGRPCBridge/@latest` (returns `v0.0.11`)
+  - `https://pkg.go.dev/github.com/monstercameron/GoGRPCBridge?tab=doc` (shows `v0.0.11` and `grpctunnel` docs)
 - result:
   - Canonical repository and module path are now aligned in public consumption flow.
-  - `@latest` for `github.com/monstercameron/grpc-tunnel` resolves to `v0.0.11` and clean-consumer install works.
+  - `@latest` for `github.com/monstercameron/GoGRPCBridge` resolves to `v0.0.11` and clean-consumer install works.
   - `pkg.go.dev` canonical docs render the latest version and package surface.
 - residual risk:
   - Local submodule branch contains additional unpublished local commit/worktree state not required for this blocker fix; keep release/tag operations pinned to known-good commit lineage.
@@ -531,7 +531,7 @@ S15.4 implementation note (2026-03-27):
 - residual risk:
   - End-to-end release publication still requires a real tag run in GitHub Actions to fully close S15.4.
   - Artifact signing/provenance (S15.6) is still open.
-  - Module path remains intentionally `github.com/monstercameron/grpc-tunnel`; renaming would be a public breaking change.
+  - Module path remains intentionally `github.com/monstercameron/GoGRPCBridge`; renaming would be a public breaking change.
 - next suggested todo:
   - S15.4 Trigger a controlled tag release and verify release visibility/artifact upload end to end.
 

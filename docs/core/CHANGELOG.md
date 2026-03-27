@@ -26,6 +26,13 @@ The format is based on Keep a Changelog and this project follows semantic versio
 - Hardened `canonical-publish-check` to accept canonical and legacy repository URLs, support fork-safe CI mode (`RUNNER_CANONICAL_SKIP_ORIGIN=1`), and validate clean-consumer server and WASM compile smoke builds.
 - Updated release and CI workflows to align with Go 1.25.x, moved release changelog extraction to `docs/core/CHANGELOG.md`, added `pkg.go.dev` discoverability checks in release validation, and replaced blind push-based auto patch tagging with intentional workflow-dispatch semver tagging.
 
+## [v0.0.19] - 2026-03-27
+
+### Highlights
+
+- Switched canonical module path/import identity to `github.com/monstercameron/GoGRPCBridge` across `go.mod`, code imports, docs, and runner publish checks.
+- Kept toolchain policy on Go `1.25`/`go1.25.8` and aligned host-repo integration references to the new module identity.
+
 ## [v0.0.18] - 2026-03-27
 
 ### Highlights
@@ -80,7 +87,7 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ### Highlights
 
-- Canonical import path is aligned to `github.com/monstercameron/grpc-tunnel` across module metadata, examples, and documentation.
+- Canonical import path is aligned to `github.com/monstercameron/GoGRPCBridge` across module metadata, examples, and documentation.
 - Release and CI canonical publish checks enforce repository/module identity and clean-consumer `go get` validation for the canonical path.
 - Release workflow canonical publish step now runs with `RUNNER_CANONICAL_GOPROXY=direct` to avoid proxy-index lag false negatives during first corrected-tag publication.
 

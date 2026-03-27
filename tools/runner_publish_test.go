@@ -3,12 +3,12 @@ package main
 import "testing"
 
 func TestParseRunnerGoModModulePath(parseT *testing.T) {
-	parseModulePath, parseErr := parseRunnerGoModModulePath("module github.com/monstercameron/grpc-tunnel\n\ngo 1.25.0\n")
+	parseModulePath, parseErr := parseRunnerGoModModulePath("module github.com/monstercameron/GoGRPCBridge\n\ngo 1.25.0\n")
 	if parseErr != nil {
 		parseT.Fatalf("parseRunnerGoModModulePath() error = %v, want nil", parseErr)
 	}
-	if parseModulePath != "github.com/monstercameron/grpc-tunnel" {
-		parseT.Fatalf("parseRunnerGoModModulePath() = %q, want %q", parseModulePath, "github.com/monstercameron/grpc-tunnel")
+	if parseModulePath != "github.com/monstercameron/GoGRPCBridge" {
+		parseT.Fatalf("parseRunnerGoModModulePath() = %q, want %q", parseModulePath, "github.com/monstercameron/GoGRPCBridge")
 	}
 }
 
@@ -27,18 +27,18 @@ func TestNormalizeRunnerRepositoryURL(parseT *testing.T) {
 	}{
 		{
 			parseName:     "https with git suffix",
-			parseInput:    "https://github.com/monstercameron/grpc-tunnel.git",
-			parseExpected: "https://github.com/monstercameron/grpc-tunnel",
+			parseInput:    "https://github.com/monstercameron/GoGRPCBridge.git",
+			parseExpected: "https://github.com/monstercameron/GoGRPCBridge",
 		},
 		{
 			parseName:     "ssh url",
-			parseInput:    "git@github.com:monstercameron/grpc-tunnel.git",
-			parseExpected: "https://github.com/monstercameron/grpc-tunnel",
+			parseInput:    "git@github.com:monstercameron/GoGRPCBridge.git",
+			parseExpected: "https://github.com/monstercameron/GoGRPCBridge",
 		},
 		{
 			parseName:     "already normalized",
-			parseInput:    "https://github.com/monstercameron/grpc-tunnel",
-			parseExpected: "https://github.com/monstercameron/grpc-tunnel",
+			parseInput:    "https://github.com/monstercameron/GoGRPCBridge",
+			parseExpected: "https://github.com/monstercameron/GoGRPCBridge",
 		},
 		{
 			parseName:     "canonical repository",
@@ -78,14 +78,11 @@ func TestBuildRunnerCanonicalEnv_WithGoProxy(parseT *testing.T) {
 
 func TestBuildRunnerCanonicalRepositoryURLs(parseT *testing.T) {
 	storeRunnerURLs := buildRunnerCanonicalRepositoryURLs()
-	if len(storeRunnerURLs) != 2 {
-		parseT.Fatalf("buildRunnerCanonicalRepositoryURLs() len = %d, want %d", len(storeRunnerURLs), 2)
+	if len(storeRunnerURLs) != 1 {
+		parseT.Fatalf("buildRunnerCanonicalRepositoryURLs() len = %d, want %d", len(storeRunnerURLs), 1)
 	}
 	if storeRunnerURLs[0] != "https://github.com/monstercameron/GoGRPCBridge" {
 		parseT.Fatalf("buildRunnerCanonicalRepositoryURLs()[0] = %q, want %q", storeRunnerURLs[0], "https://github.com/monstercameron/GoGRPCBridge")
-	}
-	if storeRunnerURLs[1] != "https://github.com/monstercameron/grpc-tunnel" {
-		parseT.Fatalf("buildRunnerCanonicalRepositoryURLs()[1] = %q, want %q", storeRunnerURLs[1], "https://github.com/monstercameron/grpc-tunnel")
 	}
 }
 
@@ -94,8 +91,8 @@ func TestHasRunnerCanonicalRepositoryURL(parseT *testing.T) {
 	if !hasRunnerCanonicalRepositoryURL("git@github.com:monstercameron/GoGRPCBridge.git", storeRunnerURLs) {
 		parseT.Fatal("hasRunnerCanonicalRepositoryURL() = false, want true for canonical URL")
 	}
-	if !hasRunnerCanonicalRepositoryURL("https://github.com/monstercameron/grpc-tunnel.git", storeRunnerURLs) {
-		parseT.Fatal("hasRunnerCanonicalRepositoryURL() = false, want true for legacy URL")
+	if hasRunnerCanonicalRepositoryURL("https://github.com/monstercameron/grpc-tunnel.git", storeRunnerURLs) {
+		parseT.Fatal("hasRunnerCanonicalRepositoryURL() = true, want false for non-canonical URL")
 	}
 	if hasRunnerCanonicalRepositoryURL("https://github.com/monstercameron/not-this-one", storeRunnerURLs) {
 		parseT.Fatal("hasRunnerCanonicalRepositoryURL() = true, want false for unknown URL")

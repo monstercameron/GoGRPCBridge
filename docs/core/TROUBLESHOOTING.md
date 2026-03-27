@@ -2,24 +2,24 @@
 
 This page lists common setup and runtime failures for GoGRPCBridge and the fastest fix path.
 
-## 1) `go get github.com/monstercameron/grpc-tunnel@latest` fails
+## 1) `go get github.com/monstercameron/GoGRPCBridge@latest` fails
 
 Symptom:
 - module-path mismatch error when resolving current `@latest` tag
 
 Cause:
-- local source now declares module path `github.com/monstercameron/grpc-tunnel`
+- local source now declares module path `github.com/monstercameron/GoGRPCBridge`
 - currently published tags may still point to older releases that declared `github.com/monstercameron/GoGRPCBridge`
 
 Fix:
-- publish a new semver tag from this repository state (module path aligned to `github.com/monstercameron/grpc-tunnel`)
+- publish a new semver tag from this repository state (module path aligned to `github.com/monstercameron/GoGRPCBridge`)
 - then retry clean consumer smoke
 
 Verification:
 
 ```bash
 go mod init example.com/smoke
-go get github.com/monstercameron/grpc-tunnel@latest
+go get github.com/monstercameron/GoGRPCBridge@latest
 ```
 
 Track:

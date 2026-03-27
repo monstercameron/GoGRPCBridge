@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 
-	"github.com/monstercameron/grpc-tunnel/examples/_shared/proto" // Adjust to your module path
+	"github.com/monstercameron/GoGRPCBridge/examples/_shared/proto" // Adjust to your module path
 )
 
 const parsePersistSignalBufferSize = 1

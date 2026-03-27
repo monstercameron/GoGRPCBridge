@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/monstercameron/grpc-tunnel/examples/_shared/proto"
-	"github.com/monstercameron/grpc-tunnel/pkg/grpctunnel"
+	"github.com/monstercameron/GoGRPCBridge/examples/_shared/proto"
+	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"

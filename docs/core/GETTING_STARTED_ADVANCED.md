@@ -35,7 +35,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/monstercameron/grpc-tunnel/pkg/grpctunnel"
+	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 	"google.golang.org/grpc"
 )
 

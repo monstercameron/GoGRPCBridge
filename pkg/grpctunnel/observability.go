@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const parseBridgeObservabilityScope = "github.com/monstercameron/grpc-tunnel/pkg/grpctunnel"
+const parseBridgeObservabilityScope = "github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 const parseBridgeRequestSpanName = "grpctunnel.bridge.request"
 const parseBridgeSessionSpanName = "grpctunnel.bridge.session"
 
