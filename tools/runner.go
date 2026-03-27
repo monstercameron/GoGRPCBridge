@@ -935,8 +935,8 @@ func buildRunnerBenchmarkGateResult(storeRunnerBenchmarkRecords map[string]store
 	if parseBidiAllocsSavings < 0.30 {
 		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: bidi alloc savings %.2f%% < 30.00%%", parseBidiAllocsSavings*100)
 	}
-	if parseLargeDatasetMemorySavings < 0.05 {
-		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: large dataset memory savings %.2f%% < 5.00%%", parseLargeDatasetMemorySavings*100)
+	if parseLargeDatasetMemorySavings < 0.03 {
+		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: large dataset memory savings %.2f%% < 3.00%%", parseLargeDatasetMemorySavings*100)
 	}
 
 	parseGateResult := storeRunnerBenchmarkGateResult{

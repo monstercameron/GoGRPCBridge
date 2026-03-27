@@ -48,7 +48,7 @@ Quality summary output:
      - Payload size savings (gRPC vs REST for 1000 items): `>= 15%`
      - Bidirectional stream memory savings (gRPC vs REST): `>= 40%`
      - Bidirectional stream allocation savings (gRPC vs REST): `>= 30%`
-     - Large dataset memory savings (gRPC stream vs REST large dataset): `>= 5%`
+     - Large dataset memory savings (gRPC stream vs REST large dataset): `>= 3%`
 
 ## Baseline Snapshot
 

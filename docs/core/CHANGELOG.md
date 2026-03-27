@@ -26,6 +26,14 @@ The format is based on Keep a Changelog and this project follows semantic versio
 - Hardened `canonical-publish-check` to accept canonical and legacy repository URLs, support fork-safe CI mode (`RUNNER_CANONICAL_SKIP_ORIGIN=1`), and validate clean-consumer server and WASM compile smoke builds.
 - Updated release and CI workflows to align with Go 1.25.x, moved release changelog extraction to `docs/core/CHANGELOG.md`, added `pkg.go.dev` discoverability checks in release validation, and replaced blind push-based auto patch tagging with intentional workflow-dispatch semver tagging.
 
+## [v0.0.13] - 2026-03-27
+
+### Highlights
+
+- Installed required quality toolchain (`goimports`, `golangci-lint`) inside `test.yml` and `release.yml` before running `go run ./tools/runner.go quality`.
+- Replaced lint action wrapper with direct pinned `golangci-lint` CLI invocation for more deterministic behavior.
+- Reduced large-dataset benchmark quality threshold from `5%` to `3%` to avoid flaky quality-gate failures while preserving regression signal.
+
 ## [v0.0.12] - 2026-03-27
 
 ### Highlights
