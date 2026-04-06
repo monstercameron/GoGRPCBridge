@@ -17,6 +17,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type mockService struct {
@@ -215,6 +216,68 @@ func TestWrap_WithOptions(parseT *testing.T) {
 
 	if !parseDisconnectCalled.Load() {
 		parseT.Error("Disconnect hook not called")
+	}
+}
+
+// TestWrap_ForwardsBridgeHeadersToMetadata verifies bridge ingress headers are forwarded to backend gRPC metadata.
+func TestWrap_ForwardsBridgeHeadersToMetadata(parseT *testing.T) {
+	parseIncomingMetadataChannel := make(chan metadata.MD, 1)
+	parseGrpcServer := grpc.NewServer(grpc.UnaryInterceptor(func(parseCtx context.Context, parseReq interface{}, parseInfo *grpc.UnaryServerInfo, parseHandler grpc.UnaryHandler) (interface{}, error) {
+		parseIncomingMetadata, _ := metadata.FromIncomingContext(parseCtx)
+		select {
+		case parseIncomingMetadataChannel <- parseIncomingMetadata.Copy():
+		default:
+		}
+		return parseHandler(parseCtx, parseReq)
+	}))
+	proto.RegisterTodoServiceServer(parseGrpcServer, &mockService{})
+	defer parseGrpcServer.Stop()
+
+	parseServer := httptest.NewServer(Wrap(parseGrpcServer))
+	defer parseServer.Close()
+
+	parseWsURL := "ws" + parseServer.URL[4:]
+	parseCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	parseConn, parseErr := DialContext(parseCtx, parseWsURL,
+		WithHeader("X-Request-Id", "req-bridge-123"),
+		WithHeader("X-Correlation-Id", "corr-bridge-456"),
+		WithHeader("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"),
+		WithHeader("tracestate", "vendor=bridge"),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if parseErr != nil {
+		parseT.Fatalf("Dial failed: %v", parseErr)
+	}
+	defer parseConn.Close()
+
+	parseClient := proto.NewTodoServiceClient(parseConn)
+	_, parseErr2 := parseClient.CreateTodo(parseCtx, &proto.CreateTodoRequest{Text: "Forwarded metadata test"})
+	if parseErr2 != nil {
+		parseT.Fatalf("CreateTodo failed: %v", parseErr2)
+	}
+
+	select {
+	case parseIncomingMetadata := <-parseIncomingMetadataChannel:
+		parseRequestIDValues := parseIncomingMetadata.Get("x-request-id")
+		if len(parseRequestIDValues) == 0 || parseRequestIDValues[0] != "req-bridge-123" {
+			parseT.Fatalf("x-request-id = %v, want req-bridge-123", parseIncomingMetadata.Get("x-request-id"))
+		}
+		parseCorrelationIDValues := parseIncomingMetadata.Get("x-correlation-id")
+		if len(parseCorrelationIDValues) == 0 || parseCorrelationIDValues[0] != "corr-bridge-456" {
+			parseT.Fatalf("x-correlation-id = %v, want corr-bridge-456", parseIncomingMetadata.Get("x-correlation-id"))
+		}
+		parseTraceParentValues := parseIncomingMetadata.Get("traceparent")
+		if len(parseTraceParentValues) == 0 || parseTraceParentValues[0] != "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" {
+			parseT.Fatalf("traceparent = %v, want forwarded traceparent", parseIncomingMetadata.Get("traceparent"))
+		}
+		parseTraceStateValues := parseIncomingMetadata.Get("tracestate")
+		if len(parseTraceStateValues) == 0 || parseTraceStateValues[0] != "vendor=bridge" {
+			parseT.Fatalf("tracestate = %v, want forwarded tracestate", parseIncomingMetadata.Get("tracestate"))
+		}
+	case <-time.After(2 * time.Second):
+		parseT.Fatal("Timed out waiting for forwarded metadata")
 	}
 }
 

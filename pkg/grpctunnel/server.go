@@ -3,13 +3,16 @@
 package grpctunnel
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
@@ -17,6 +20,10 @@ import (
 
 const parseDefaultWebSocketBufferSize = 4096
 const parseDefaultReadLimitBytes int64 = 16 << 20
+const parseBridgeTraceParentMetadataKey = "traceparent"
+const parseBridgeTraceStateMetadataKey = "tracestate"
+const parseBridgeRequestIDMetadataKey = "x-request-id"
+const parseBridgeCorrelationIDMetadataKey = "x-correlation-id"
 
 var cacheWebSocketWriteBufferPools sync.Map
 
@@ -264,6 +271,112 @@ func buildBridgePingWriteTimeout(parseConfig BridgeConfig) time.Duration {
 	return parseWriteTimeout
 }
 
+// parseBuildBridgeForwardHeaders builds per-connection HTTP/2 headers forwarded to backend gRPC metadata.
+func parseBuildBridgeForwardHeaders(parseRequest *http.Request, parseContext context.Context) http.Header {
+	parseForwardHeaders := make(http.Header)
+	if parseRequest != nil {
+		parseRequestID := strings.TrimSpace(getGrpctunnelRequestID(parseRequest))
+		if parseRequestID != "" {
+			parseForwardHeaders.Set(parseBridgeRequestIDMetadataKey, parseRequestID)
+		}
+		parseCorrelationID := parseResolveBridgeHeaderValue(parseRequest.Header, "X-Correlation-Id", "X-Correlation-ID")
+		if parseCorrelationID == "" {
+			parseCorrelationID = parseRequestID
+		}
+		if parseCorrelationID != "" {
+			parseForwardHeaders.Set(parseBridgeCorrelationIDMetadataKey, parseCorrelationID)
+		}
+		parseTraceParent := parseResolveBridgeHeaderValue(parseRequest.Header, parseBridgeTraceParentMetadataKey)
+		if parseTraceParent != "" {
+			parseForwardHeaders.Set(parseBridgeTraceParentMetadataKey, parseTraceParent)
+		}
+		parseTraceState := parseResolveBridgeHeaderValue(parseRequest.Header, parseBridgeTraceStateMetadataKey)
+		if parseTraceState != "" {
+			parseForwardHeaders.Set(parseBridgeTraceStateMetadataKey, parseTraceState)
+		}
+	}
+	if strings.TrimSpace(parseForwardHeaders.Get(parseBridgeTraceParentMetadataKey)) == "" {
+		parseTraceParent := parseBuildBridgeTraceParentFromContext(parseContext)
+		if parseTraceParent != "" {
+			parseForwardHeaders.Set(parseBridgeTraceParentMetadataKey, parseTraceParent)
+		}
+	}
+	if strings.TrimSpace(parseForwardHeaders.Get(parseBridgeTraceStateMetadataKey)) == "" {
+		parseTraceState := parseBuildBridgeTraceStateFromContext(parseContext)
+		if parseTraceState != "" {
+			parseForwardHeaders.Set(parseBridgeTraceStateMetadataKey, parseTraceState)
+		}
+	}
+	return parseForwardHeaders
+}
+
+// parseResolveBridgeHeaderValue returns the first non-empty value among candidate request headers.
+func parseResolveBridgeHeaderValue(parseHeaders http.Header, parseHeaderNames ...string) string {
+	if parseHeaders == nil {
+		return ""
+	}
+	for _, parseHeaderName := range parseHeaderNames {
+		parseHeaderName = strings.TrimSpace(parseHeaderName)
+		if parseHeaderName == "" {
+			continue
+		}
+		parseHeaderValue := strings.TrimSpace(parseHeaders.Get(parseHeaderName))
+		if parseHeaderValue != "" {
+			return parseHeaderValue
+		}
+	}
+	return ""
+}
+
+// parseBuildBridgeTraceParentFromContext formats one W3C traceparent value from context span state.
+func parseBuildBridgeTraceParentFromContext(parseContext context.Context) string {
+	parseSpanContext := trace.SpanContextFromContext(parseContext)
+	if !parseSpanContext.IsValid() {
+		return ""
+	}
+	parseFlags := byte(parseSpanContext.TraceFlags())
+	return fmt.Sprintf("00-%s-%s-%02x", parseSpanContext.TraceID().String(), parseSpanContext.SpanID().String(), parseFlags)
+}
+
+// parseBuildBridgeTraceStateFromContext returns a trimmed tracestate value from context span state.
+func parseBuildBridgeTraceStateFromContext(parseContext context.Context) string {
+	parseSpanContext := trace.SpanContextFromContext(parseContext)
+	if !parseSpanContext.IsValid() {
+		return ""
+	}
+	return strings.TrimSpace(parseSpanContext.TraceState().String())
+}
+
+// parseWrapBridgeForwardMetadataHandler injects forwarded bridge headers into each tunneled HTTP/2 request.
+func parseWrapBridgeForwardMetadataHandler(parseHandler http.Handler, parseForwardHeaders http.Header) http.Handler {
+	if parseHandler == nil {
+		return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	}
+	parseForwardHeaders = parseForwardHeaders.Clone()
+	return http.HandlerFunc(func(parseW http.ResponseWriter, parseR *http.Request) {
+		if parseR == nil {
+			parseHandler.ServeHTTP(parseW, parseR)
+			return
+		}
+		parseRequestHeaders := parseR.Header.Clone()
+		if parseRequestHeaders == nil {
+			parseRequestHeaders = make(http.Header)
+		}
+		for parseHeaderKey, parseHeaderValues := range parseForwardHeaders {
+			if strings.TrimSpace(parseRequestHeaders.Get(parseHeaderKey)) != "" {
+				continue
+			}
+			if len(parseHeaderValues) == 0 {
+				continue
+			}
+			parseRequestHeaders[parseHeaderKey] = append([]string{}, parseHeaderValues...)
+		}
+		parseRequest := parseR.Clone(parseR.Context())
+		parseRequest.Header = parseRequestHeaders
+		parseHandler.ServeHTTP(parseW, parseRequest)
+	})
+}
+
 // BuildBridgeHandler creates a typed websocket handler for a gRPC server.
 func BuildBridgeHandler(parseGrpcServer *grpc.Server, parseConfig BridgeConfig) (http.Handler, error) {
 	if parseGrpcServer == nil {
@@ -346,10 +459,13 @@ func BuildBridgeHandler(parseGrpcServer *grpc.Server, parseConfig BridgeConfig) 
 		// Wrap WebSocket as net.Conn
 		parseConn := newWebSocketConn(parseWs)
 		defer parseConn.Close()
+		parseForwardHeaders := parseBuildBridgeForwardHeaders(parseR2, parseSessionContext)
+		parseForwardHandler := parseWrapBridgeForwardMetadataHandler(parseServeH2CHandler, parseForwardHeaders)
 
 		// Serve gRPC over HTTP/2 on the WebSocket connection
 		parseHTTP2Server.ServeConn(parseConn, &http2.ServeConnOpts{
-			Handler: parseServeH2CHandler,
+			Context: parseSessionContext,
+			Handler: parseForwardHandler,
 		})
 	}), nil
 }
