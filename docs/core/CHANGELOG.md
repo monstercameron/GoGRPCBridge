@@ -6,6 +6,22 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-07-21
+
+### Highlights
+
+- Pre-production rollout hardening: session lifetime bounds for token expiry and proxy alignment, a verified graceful-draining story (including a pinned grpc-go limitation in handler mode), and a rollout test suite covering backpressure, concurrent streaming, and reconnect storms.
+
+### Added
+
+- `WithSessionMaxLifetime` / `BridgeConfig.SessionMaxLifetime` — force-closes tunnel sessions after a configured duration, bounding how long a session can outlive its upgrade-time authorization (token expiry) and aligning with reverse-proxy maximum-connection lifetimes. Clients reconnect automatically and re-pass the `Authorize` hook (verified end-to-end).
+- Rollout test suite (`rollout_test.go`): slow-reader backpressure (sender provably stalls at ~2 MB in flight against a stalled peer, drains cleanly), 12-client concurrent streaming in both transport modes, a 16-client reconnect storm after a hard outage, native-mode graceful draining, and session-lifetime re-authorization.
+- `CONNECTION_LIFECYCLE.md` pre-production rollout checklist: what the suite verifies versus what must be validated per environment (proxy lifetimes, horizontal scaling/affinity, browser memory soaks, CDN/WAF/corporate-proxy compatibility, no-WebSocket fallback caveat).
+
+### Fixed / Documented
+
+- **Handler-mode `GracefulStop` panics with active tunnels** — grpc-go's ServeHTTP transport has an unimplemented `Drain()`. The limitation is now pinned by a test (which fails if a future grpc-go implements it) and documented with the handler-mode drain recipe: stop new upgrades, bound remaining sessions via `WithSessionMaxLifetime`, then `Stop()`. Native transport mode drains correctly and is verified.
+
 ## [v1.0.0] - 2026-07-21
 
 ### Highlights

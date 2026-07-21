@@ -89,6 +89,12 @@ type BridgeConfig struct {
 	// Without keepalive, silently dropped clients hold connection slots until
 	// the OS TCP timeout; disable only when an upstream boundary owns liveness.
 	ShouldDisableKeepalive bool
+	// SessionMaxLifetime force-closes tunnel sessions after this duration,
+	// bounding how long a connection can outlive its upgrade-time
+	// authorization (token expiry) and aligning with reverse-proxy
+	// maximum-connection lifetimes. Clients reconnect automatically and
+	// re-pass the Authorize hook. Zero disables the bound.
+	SessionMaxLifetime time.Duration
 	// ShouldUseNativeGRPCTransport serves tunneled sessions through
 	// grpc.Server.Serve and gRPC's own HTTP/2 transport instead of the
 	// net/http handler path. This is significantly cheaper per RPC (fewer

@@ -96,6 +96,7 @@ If a load balancer sits in front with an idle timeout below 30s, lower `PingInte
 | Server-stream drain | baseline | **~20% faster, −46% bytes** |
 | Upgrade-header → RPC metadata forwarding | yes (`x-request-id`, `traceparent`, …) | no (connection-level logging only) |
 | gRPC server keepalive/settings | not applied | fully applied |
+| `grpcServer.GracefulStop()` with active tunnels | **panics** (grpc-go's ServeHTTP transport has an unimplemented `Drain()`; pinned by `TestGracefulDrain_HandlerModeLimitation`) | drains correctly: waits for in-flight streams, rejects new sessions |
 | Requirement | — | `grpc.Server` must not carry transport credentials (TLS terminates at the websocket/HTTP layer) |
 
 Prefer native mode when you don't rely on forwarded upgrade headers — it roughly halves GC pressure per RPC.
@@ -109,6 +110,25 @@ The tunnel has no maximum session duration and no per-stream volume cap; sustain
 - **Backpressure is end-to-end**: HTTP/2 per-stream flow-control windows bound in-flight data in both directions, including in the browser (a slow WASM reader stops window updates, which stops the server; the browser-side inbound queue caps at 256 messages / 16 MB above that). Native mode adds gRPC's BDP-aware dynamic windows — prefer it for high-latency, high-throughput links.
 - **Keepalive coexists with active streams**: server pings continue during transfers and any live peer answers pongs, so the idle timeout never fires mid-stream; an upload whose sender dies is reclaimed within the idle window.
 - **Resumption is application-level**, as with any gRPC stream: a mid-stream disconnect fails the RPC with `UNAVAILABLE`, the channel redials automatically, and your app restarts the stream (e.g., from a byte offset or sequence number).
+
+## Pre-production rollout checklist
+
+What is verified in this repo's test suite versus what you must validate in your own environment before a high-criticality rollout.
+
+**Verified by the test suite** (`rollout_test.go`, `leak_test.go`, `streaming_soak_test.go`):
+
+1. **Slow readers / backpressure** — a sender pushing into a stalled peer blocks after ~2 MB in flight (HTTP/2 flow control), and drains cleanly once the peer reads. Browser-side inbound queues cap at 256 messages / 16 MB above flow control.
+2. **Concurrent streaming workloads** — 12 simultaneous clients each streaming 4 MiB complete with full integrity in both transport modes; goroutine-leak tests confirm per-session resources release.
+3. **Reconnect storms** — a 16-client fleet dropped by a hard outage reconnects concurrently once the bridge returns. Note two per-instance interactions: `WithMaxUpgradesPerClientPerMinute` counts reconnecting clients (behind one NAT they share a key — size the limit for herd recovery), and gRPC's backoff jitter naturally spreads the storm.
+4. **Deployment draining** — in **native mode**, `grpcServer.GracefulStop()` waits for in-flight tunneled streams and rejects new ones. In **handler mode `GracefulStop` panics with active tunnels** (grpc-go limitation); drain handler-mode deployments by stopping new upgrades (shut the HTTP server), bounding remaining sessions with `WithSessionMaxLifetime`, then calling `Stop()`.
+5. **Token expiry during long streams** — `WithSessionMaxLifetime` force-closes sessions at a bound you align with token TTLs; clients transparently reconnect and re-pass the `Authorize` hook (verified). For per-RPC enforcement, add a standard gRPC auth interceptor on your `grpc.Server` — in handler mode it also sees forwarded upgrade headers.
+
+**Validate in your environment** (cannot be proven from inside this repo):
+
+6. **Reverse-proxy idle and max-connection lifetimes** — default 30s pings survive common idle windows (ALB/nginx 60s), but confirm your proxy's values; set `PingInterval` below the idle window. For hard max-connection lifetimes (e.g., ALB), set `WithSessionMaxLifetime` slightly *below* the proxy's cap so terminations are orderly bridge-side closes rather than mid-write resets. Confirm the proxy passes WebSocket upgrades on your bridge path with buffering disabled.
+7. **Horizontal scaling** — **no session affinity is required by the bridge**: tunnels carry no cross-request server state, any client can land on any instance, and reconnects may land elsewhere. Two caveats: abuse-control counters and `MaxActiveConnections` are per-instance (enforce global limits at the LB), and if your *services* keep per-session state, that's your affinity requirement, not the bridge's.
+8. **Browser memory over long sessions** — bounded by design (flow-control windows + the 256-msg/16 MB inbound cap + released JS handlers), and Go-side leak tests pass — but run a real multi-hour browser soak with your app's traffic profile watching `performance.memory`, because your application's retained state dominates.
+9. **CDNs, WAFs, corporate proxies** — requires WebSocket passthrough end-to-end. Verify: CDN/WAF WebSocket support and their connection-duration caps (CloudFront/WAF products often cap long-lived connections), no response buffering on the bridge path, and `wss://` (port 443) for corporate-proxy traversal. **There is no HTTP long-polling fallback** — an environment that strips WebSocket upgrades cannot reach the bridge; detect the failed upgrade client-side and degrade in your app.
 
 ## Session hooks
 

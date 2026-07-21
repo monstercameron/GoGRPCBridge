@@ -38,6 +38,7 @@ type serverOptions struct {
 	shouldDisableReadLimit   bool
 	pingInterval             time.Duration
 	idleTimeout              time.Duration
+	sessionMaxLifetime       time.Duration
 	shouldDisableKeepalive   bool
 	shouldUseNativeTransport bool
 	onConnect                func(r *http.Request)
@@ -149,6 +150,17 @@ func WithKeepaliveDisabled() ServerOption {
 	}
 }
 
+// WithSessionMaxLifetime force-closes tunnel sessions after the given
+// duration. Use it to bound how long a session can outlive its upgrade-time
+// authorization (token expiry) and to stay under reverse-proxy
+// maximum-connection lifetimes. Clients reconnect automatically and re-pass
+// the Authorize hook on the new upgrade.
+func WithSessionMaxLifetime(maxLifetime time.Duration) ServerOption {
+	return func(o *serverOptions) {
+		o.sessionMaxLifetime = maxLifetime
+	}
+}
+
 // WithNativeGRPCTransport serves tunneled sessions through grpc.Server.Serve
 // and gRPC's own HTTP/2 transport instead of the net/http handler path. See
 // BridgeConfig.ShouldUseNativeGRPCTransport for the tradeoffs.
@@ -228,6 +240,9 @@ func GetBridgeConfigError(cfg BridgeConfig) error {
 	}
 	if cfg.ShouldDisableKeepalive && (cfg.PingInterval > 0 || cfg.IdleTimeout > 0) {
 		return fmt.Errorf("grpctunnel: PingInterval/IdleTimeout cannot be set when ShouldDisableKeepalive is true")
+	}
+	if cfg.SessionMaxLifetime < 0 {
+		return fmt.Errorf("grpctunnel: SessionMaxLifetime must be >= 0")
 	}
 	if cfg.MaxActiveConnections < 0 {
 		return fmt.Errorf("grpctunnel: MaxActiveConnections must be >= 0")
@@ -572,6 +587,14 @@ func BuildBridgeHandler(grpcServer *grpc.Server, cfg BridgeConfig) (http.Handler
 		conn := newWebSocketConn(ws)
 		defer conn.Close()
 
+		if cfg.SessionMaxLifetime > 0 {
+			lifetimeTimer := time.AfterFunc(cfg.SessionMaxLifetime, func() {
+				logGrpctunnelEvent("grpctunnel.bridge", "INFO", "session_max_lifetime_reached", r, nil, "Session max lifetime reached; closing tunnel")
+				_ = conn.Close()
+			})
+			defer lifetimeTimer.Stop()
+		}
+
 		if nativeListener != nil {
 			// Hand the session to gRPC's native HTTP/2 transport and block
 			// until the transport closes it, so disconnect hooks, metrics,
@@ -637,6 +660,7 @@ func buildBridgeConfig(options *serverOptions) BridgeConfig {
 		ShouldDisableReadLimit:        options.shouldDisableReadLimit,
 		PingInterval:                  options.pingInterval,
 		IdleTimeout:                   options.idleTimeout,
+		SessionMaxLifetime:            options.sessionMaxLifetime,
 		ShouldDisableKeepalive:        options.shouldDisableKeepalive,
 		ShouldUseNativeGRPCTransport:  options.shouldUseNativeTransport,
 		ShouldEnableCompression:       options.shouldEnableCompression,
