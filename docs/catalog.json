@@ -115,6 +115,11 @@
         "section": "Core"
     },
     {
+        "path": "core/ROLLOUT_TODOS.md",
+        "title": "Rollout TODOs",
+        "section": "Core"
+    },
+    {
         "path": "core/SECURITY_FUZZ_PROCESS.md",
         "title": "Security Fuzz Process",
         "section": "Core"

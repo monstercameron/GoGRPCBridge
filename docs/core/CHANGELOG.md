@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+## [v1.1.1] - 2026-07-21
+
+### Security
+
+- Upgraded `golang.org/x/text` v0.37.0 → v0.39.0 (root module and `examples/wasm-client`) to clear GO-2026-5970, a fresh advisory reachable via the HTTP/2 serving path. The v1.1.0 release gate correctly blocked publication on this advisory; v1.1.1 ships the same code with the patched dependency.
+
+### Added
+
+- `docs/core/ROLLOUT_TODOS.md` — actionable environment-validation checklist for high-criticality rollouts (reverse-proxy lifetimes, horizontal scaling, auth alignment, browser soaks, CDN/WAF/corporate networks, deployment drain rehearsal), complementing the suite-verified behaviors in `CONNECTION_LIFECYCLE.md`.
+
 ## [v1.1.0] - 2026-07-21
 
 ### Highlights

@@ -22,6 +22,7 @@ This is the fast navigation map for GoGRPCBridge docs.
 ## Ops
 
 - Connect/disconnect/timeouts/reconnect guide: [CONNECTION_LIFECYCLE.md](./CONNECTION_LIFECYCLE.md)
+- Environment validation before rollout: [ROLLOUT_TODOS.md](./ROLLOUT_TODOS.md)
 - Quality/release gates: [QUALITY_GATES.md](./QUALITY_GATES.md)
 - Release checklist: [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md)
 - Performance behavior and measurements: [PERFORMANCE.md](./PERFORMANCE.md)
