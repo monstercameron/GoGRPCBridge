@@ -99,8 +99,19 @@ jobs:
         run: go test ./pkg/bridge ./pkg/grpctunnel -v -run '^Fuzz' -timeout 5m
 
       - name: Install Playwright
+        # The playwright.azureedge.net driver CDN was retired (404s), so the
+        # driver is installed from npm instead: playwright-core@1.60.0 IS the
+        # driver bundle playwright-go v0.6000.0 expects. Browser downloads go
+        # through the driver itself, which carries current CDN endpoints.
         run: |
-          go run github.com/playwright-community/playwright-go/cmd/playwright@${{ env.PLAYWRIGHT_GO_VERSION }} install --with-deps chromium
+          DRIVER_DIR="$HOME/pw-driver"
+          mkdir -p "$DRIVER_DIR"
+          npm pack playwright-core@1.60.0 --pack-destination "$DRIVER_DIR"
+          tar -xzf "$DRIVER_DIR"/playwright-core-1.60.0.tgz -C "$DRIVER_DIR"
+          echo "PLAYWRIGHT_DRIVER_PATH=$DRIVER_DIR" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_NODEJS_PATH=$(command -v node)" >> "$GITHUB_ENV"
+          PLAYWRIGHT_DRIVER_PATH="$DRIVER_DIR" PLAYWRIGHT_NODEJS_PATH="$(command -v node)" \
+            go run github.com/playwright-community/playwright-go/cmd/playwright@${{ env.PLAYWRIGHT_GO_VERSION }} install --with-deps chromium
 
       - name: Run e2e tests
         run: go test ./e2e/... -v -timeout 5m

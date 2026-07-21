@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+### Changed
+
+- CI: fuzz seed corpus now runs deterministically via `-run '^Fuzz'` instead of timed `-fuzztime` fuzzing, which intermittently failed at the fuzztime boundary with the Go fuzz engine's "context deadline exceeded" worker-shutdown race on loaded runners.
+- CI: the Playwright driver is installed from npm (`playwright-core@1.60.0` + `PLAYWRIGHT_DRIVER_PATH`) — the `playwright.azureedge.net` driver CDN was retired and 404s for every driver version, and playwright-go v0.6100.0 is unusable (its tag declares the old `mxschmitt` module path).
+- Cleaned residual machine-generated `parse*` naming from documentation code samples (`docs/core/README.md`, `GETTING_STARTED_ADVANCED.md`).
+
 ## [v0.2.0] - 2026-07-21
 
 ### Highlights

@@ -49,9 +49,9 @@ func isBridgeOriginAllowed(r *http.Request) bool {
 }
 
 func main() {
-	parseGrpcServer := grpc.NewServer()
-	parseBridgeHandler := grpctunnel.Wrap(
-		parseGrpcServer,
+	grpcServer := grpc.NewServer()
+	bridgeHandler := grpctunnel.Wrap(
+		grpcServer,
 		grpctunnel.WithOriginCheck(isBridgeOriginAllowed),
 		grpctunnel.WithReadLimitBytes(4<<20),
 		grpctunnel.WithKeepalive(30*time.Second, 2*time.Minute),
@@ -66,18 +66,18 @@ func main() {
 		}),
 	)
 
-	parseMux := http.NewServeMux()
-	parseMux.Handle("/grpc", parseBridgeHandler)
+	mux := http.NewServeMux()
+	mux.Handle("/grpc", bridgeHandler)
 
-	parseServer := &http.Server{
+	server := &http.Server{
 		Addr:              ":8443",
-		Handler:           parseMux,
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 	}
-	log.Fatal(parseServer.ListenAndServeTLS("/etc/certs/fullchain.pem", "/etc/certs/privkey.pem"))
+	log.Fatal(server.ListenAndServeTLS("/etc/certs/fullchain.pem", "/etc/certs/privkey.pem"))
 }
 ```
 
@@ -92,7 +92,7 @@ Why this matters:
 Use reconnect policy intentionally and validate it under fault conditions.
 
 ```go
-parseReconnectPolicy := grpctunnel.ReconnectConfig{
+reconnectPolicy := grpctunnel.ReconnectConfig{
 	InitialDelay:      250 * time.Millisecond,
 	MaxDelay:          8 * time.Second,
 	Multiplier:        1.7,
@@ -100,9 +100,9 @@ parseReconnectPolicy := grpctunnel.ReconnectConfig{
 	MinConnectTimeout: 4 * time.Second,
 }
 
-parseConn, parseErr := grpctunnel.BuildTunnelConn(parseCtx, grpctunnel.TunnelConfig{
+conn, err := grpctunnel.BuildTunnelConn(ctx, grpctunnel.TunnelConfig{
 	Target:          "wss://bridge.example.com/grpc",
-	ReconnectConfig: &parseReconnectPolicy,
+	ReconnectConfig: &reconnectPolicy,
 	GRPCOptions:     grpctunnel.ApplyTunnelInsecureCredentials(nil),
 })
 ```

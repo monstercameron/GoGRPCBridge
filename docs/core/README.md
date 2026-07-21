@@ -93,16 +93,16 @@ import (
 )
 
 func main() {
-    parseGrpcServer := grpc.NewServer()
+    grpcServer := grpc.NewServer()
     // Register your generated service servers here.
-    // examplepb.RegisterGreeterServer(parseGrpcServer, &greeterServer{})
+    // examplepb.RegisterGreeterServer(grpcServer, &greeterServer{})
 
-    parseMux := http.NewServeMux()
-    if parseHandleError := grpctunnel.HandleBridgeMux(parseMux, "/grpc", parseGrpcServer, grpctunnel.BridgeConfig{}); parseHandleError != nil {
-        log.Fatal(parseHandleError)
+    mux := http.NewServeMux()
+    if err := grpctunnel.HandleBridgeMux(mux, "/grpc", grpcServer, grpctunnel.BridgeConfig{}); err != nil {
+        log.Fatal(err)
     }
 
-    log.Fatal(http.ListenAndServe(":8080", parseMux))
+    log.Fatal(http.ListenAndServe(":8080", mux))
 }
 ```
 
@@ -122,25 +122,25 @@ import (
 )
 
 func main() {
-    parseConnection, parseConnectionError := grpctunnel.BuildTunnelConn(context.Background(), grpctunnel.TunnelConfig{
+    conn, err := grpctunnel.BuildTunnelConn(context.Background(), grpctunnel.TunnelConfig{
         Target:      "/grpc", // same-origin path
         GRPCOptions: grpctunnel.ApplyTunnelInsecureCredentials(nil),
     })
-    if parseConnectionError != nil {
-        log.Fatal(parseConnectionError)
+    if err != nil {
+        log.Fatal(err)
     }
-    defer parseConnection.Close()
+    defer conn.Close()
 
-    parseClient := examplepb.NewGreeterClient(parseConnection)
-    parseResponse, parseCallError := parseClient.SayHello(
+    client := examplepb.NewGreeterClient(conn)
+    response, err := client.SayHello(
         context.Background(),
         &examplepb.HelloRequest{Name: "web"},
     )
-    if parseCallError != nil {
-        log.Fatal(parseCallError)
+    if err != nil {
+        log.Fatal(err)
     }
 
-    log.Printf("RPC response: %s", parseResponse.GetMessage())
+    log.Printf("RPC response: %s", response.GetMessage())
 }
 ```
 
