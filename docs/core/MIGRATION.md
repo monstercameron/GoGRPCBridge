@@ -2,6 +2,10 @@
 
 This guide covers migration to the typed `grpctunnel` API.
 
+## v1.0.0
+
+No API or behavior changes from v0.2.0. v1.0.0 marks the stability commitment: the exported API of `pkg/grpctunnel` and `pkg/wasm/dialer` follows semantic versioning from here on, with compatibility enforced in CI by the API guard. `pkg/bridge` remains deprecated and frozen.
+
 ## v0.2.0 Behavior Changes
 
 - **Server keepalive is now on by default** (30s websocket ping, 120s idle timeout) so silently dead clients are reclaimed instead of pinning resources until the OS TCP timeout. If a proxy in front of the bridge owns connection liveness, restore the old behavior with `WithKeepaliveDisabled()` (or `BridgeConfig.ShouldDisableKeepalive`). Setting explicit `WithKeepalive` values together with `WithKeepaliveDisabled` is now a validation error.

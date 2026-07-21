@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+## [v1.0.0] - 2026-07-21
+
+### Highlights
+
+- **First stable release.** The exported API of `pkg/grpctunnel` is now covered by semantic-versioning compatibility guarantees: no breaking changes without a major version bump, enforced in CI by the API-compatibility guard. Functionally identical to v0.2.0 plus the robustness suite below.
+
+### Stability statement
+
+- Supported public API: `pkg/grpctunnel` (server bridge, client dialing, hardening options, lifecycle controls, tooling helpers) and `pkg/wasm/dialer` (browser dial primitives).
+- `pkg/bridge` remains deprecated; it is frozen but not removed.
+- Every release gate is green: lint, race + coverage (≥90%), fuzz seed corpus, goroutine-leak regression, 32 MiB streaming soak, Playwright browser e2e, gosec, govulncheck, CodeQL, API governance, and benchmark trend gates.
+
 ### Added
 
 - Leak and robustness regression suite: goroutine-leak tests over repeated connect/RPC/disconnect cycles (handler mode, native mode, and rejected-upgrade paths), abuse-guard slot-accounting verification, read-limit breach enforcement, 32 MiB streaming soak tests through both transports, and sustained-throughput benchmarks (~615 MB/s handler / ~835 MB/s native on 64 KB chunks, loopback).

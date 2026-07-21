@@ -36,7 +36,7 @@ Browser (Go WASM gRPC client)
 go get github.com/monstercameron/GoGRPCBridge@latest
 ```
 
-Requires Go 1.25+.
+Requires Go 1.25+. As of v1.0.0 the exported API of `pkg/grpctunnel` follows semantic versioning: no breaking changes without a major version bump, enforced in CI by an API-compatibility guard.
 
 ## Quick Start
 
