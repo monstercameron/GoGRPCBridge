@@ -1,0 +1,26 @@
+# Normalize all text files to LF in the repository and working tree.
+# Go tooling (gofmt, golangci-lint) assumes LF; this keeps Windows checkouts
+# from producing false formatting diffs.
+* text=auto eol=lf
+
+*.go text eol=lf
+*.mod text eol=lf
+*.sum text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.sh text eol=lf
+*.proto text eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.wasm binary

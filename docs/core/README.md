@@ -59,9 +59,6 @@ Browsers do not expose raw TCP/HTTP2 sockets for native gRPC clients. GoGRPCBrid
 | Apply triage SLA policy | [TRIAGE_SLA.md](./TRIAGE_SLA.md) |
 | Follow maintenance schedule | [MAINTENANCE_SCHEDULE.md](./MAINTENANCE_SCHEDULE.md) |
 | Apply docs freshness policy | [DOCS_FRESHNESS_POLICY.md](./DOCS_FRESHNESS_POLICY.md) |
-| Track adoption and friction metrics | [ADOPTION_METRICS.md](./ADOPTION_METRICS.md) |
-| Run incident-feedback backlog loop | [BACKLOG_FEEDBACK_LOOP.md](./BACKLOG_FEEDBACK_LOOP.md) |
-| Track 10/10 maturity plan | [ROADMAP_TO_10S.md](./ROADMAP_TO_10S.md) |
 
 ---
 

@@ -117,6 +117,35 @@ jobs:
           flags: unittests
           name: codecov-ubuntu-go${{ matrix.go-version }}
 
+  wasm:
+    name: WASM Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Compile all packages for js/wasm
+        run: GOOS=js GOARCH=wasm go build ./pkg/...
+
+      - name: Run grpctunnel wasm tests under Node
+        # pkg/wasm/dialer stays compile-only here: its suite passes but the
+        # Node wasm_exec harness deadlocks at process exit (pre-existing,
+        # tracked separately).
+        run: |
+          GOOS=js GOARCH=wasm go test ./pkg/grpctunnel/ \
+            -exec "$(go env GOROOT)/lib/wasm/go_js_wasm_exec"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

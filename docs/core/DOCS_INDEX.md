@@ -6,7 +6,6 @@ This is the fast navigation map for GoGRPCBridge docs.
 
 - Start here: [README.md Quick Start](./README.md#quick-start)
 - Build and validation commands: [README.md Development Runner](./README.md#development-runner)
-- Step-by-step execution checklist: [GETTING_STARTED_TODOS.md](./GETTING_STARTED_TODOS.md)
 - Production-oriented extension: [GETTING_STARTED_ADVANCED.md](./GETTING_STARTED_ADVANCED.md)
 
 ## API
@@ -38,13 +37,7 @@ This is the fast navigation map for GoGRPCBridge docs.
 - Triage SLA and severity policy: [TRIAGE_SLA.md](./TRIAGE_SLA.md)
 - Dependency and toolchain maintenance cadence: [MAINTENANCE_SCHEDULE.md](./MAINTENANCE_SCHEDULE.md)
 - Docs freshness cadence and ownership: [DOCS_FRESHNESS_POLICY.md](./DOCS_FRESHNESS_POLICY.md)
-- Adoption and friction tracking: [ADOPTION_METRICS.md](./ADOPTION_METRICS.md)
-- Incident/user-feedback backlog loop: [BACKLOG_FEEDBACK_LOOP.md](./BACKLOG_FEEDBACK_LOOP.md)
 - Contributor workflow: [CONTRIBUTING.md](./CONTRIBUTING.md)
-- Host-repo integration matrix: [GOGRPCBRIDGE_INTEGRATION_MATRIX.md](./GOGRPCBRIDGE_INTEGRATION_MATRIX.md)
-- Required CI/check policy (host repo): [GOGRPCBRIDGE_REQUIRED_CHECKS.md](./GOGRPCBRIDGE_REQUIRED_CHECKS.md)
-- Submodule lifecycle operations (host repo): [GOGRPCBRIDGE_SUBMODULE_LIFECYCLE.md](./GOGRPCBRIDGE_SUBMODULE_LIFECYCLE.md)
-- Dev-to-prod execution roadmap: [GOGRPCBRIDGE_DEV_TO_PROD_ROADMAP.md](./GOGRPCBRIDGE_DEV_TO_PROD_ROADMAP.md)
 - Tool runner entrypoint: `go run ./tools/runner.go help`
 
 ## Security

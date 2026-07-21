@@ -363,32 +363,64 @@ func buildBridgeTraceStateFromContext(ctx context.Context) string {
 	return strings.TrimSpace(spanContext.TraceState().String())
 }
 
-// wrapBridgeForwardMetadataHandler injects forwarded bridge headers into each tunneled HTTP/2 request.
+// forwardHeaderEntry is one precomputed header the bridge forwards into
+// tunneled requests that do not already carry it.
+type forwardHeaderEntry struct {
+	key    string
+	values []string
+}
+
+// wrapBridgeForwardMetadataHandler injects forwarded bridge headers into each
+// tunneled HTTP/2 request. The forward set is fixed per websocket session, so
+// it is snapshotted once; per request the handler clones nothing unless at
+// least one header is actually missing, and then clones exactly once.
 func wrapBridgeForwardMetadataHandler(handler http.Handler, forwardHeaders http.Header) http.Handler {
 	if handler == nil {
 		return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	}
-	forwardHeaders = forwardHeaders.Clone()
+
+	forwardEntries := make([]forwardHeaderEntry, 0, len(forwardHeaders))
+	for headerKey, headerValues := range forwardHeaders {
+		if len(headerValues) == 0 {
+			continue
+		}
+		forwardEntries = append(forwardEntries, forwardHeaderEntry{
+			key:    http.CanonicalHeaderKey(headerKey),
+			values: append([]string{}, headerValues...),
+		})
+	}
+	if len(forwardEntries) == 0 {
+		return handler
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r == nil {
 			handler.ServeHTTP(w, r)
 			return
 		}
-		requestHeaders := r.Header.Clone()
-		if requestHeaders == nil {
-			requestHeaders = make(http.Header)
-		}
-		for headerKey, headerValues := range forwardHeaders {
-			if strings.TrimSpace(requestHeaders.Get(headerKey)) != "" {
-				continue
+
+		needsInjection := false
+		for _, entry := range forwardEntries {
+			if strings.TrimSpace(r.Header.Get(entry.key)) == "" {
+				needsInjection = true
+				break
 			}
-			if len(headerValues) == 0 {
-				continue
-			}
-			requestHeaders[headerKey] = append([]string{}, headerValues...)
 		}
+		if !needsInjection {
+			handler.ServeHTTP(w, r)
+			return
+		}
+
 		forwarded := r.Clone(r.Context())
-		forwarded.Header = requestHeaders
+		if forwarded.Header == nil {
+			forwarded.Header = make(http.Header)
+		}
+		for _, entry := range forwardEntries {
+			if strings.TrimSpace(forwarded.Header.Get(entry.key)) != "" {
+				continue
+			}
+			forwarded.Header[entry.key] = append([]string{}, entry.values...)
+		}
 		handler.ServeHTTP(w, forwarded)
 	})
 }

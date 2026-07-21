@@ -6,6 +6,29 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+## [v0.1.1] - 2026-07-21
+
+### Highlights
+
+- Performance, documentation, and repository-professionalism release. No API changes.
+
+### Performance
+
+- Per-RPC forward-metadata injection no longer clones request headers twice. Requests already carrying trace/request metadata now pass through with zero allocations (1072 ns → 65 ns, 8 allocs → 0), sessions with no forwardable headers skip the wrapper entirely (295 ns → 2.6 ns), and the injection path drops ~31% of bytes allocated. Micro-benchmarks added in `server_bench_test.go`.
+
+### Documentation
+
+- Rewrote the root `README.md` as a professional landing page: feature matrix, quick starts (server, browser WASM, native client), hardening guide, API overview table, and deployment caveats.
+- Added runnable pkg.go.dev examples (`example_test.go`): `Wrap`, `NewServer` with graceful shutdown, `WithAuthorize`, `WithAllowedOrigins`, `Dial`, and `BuildTunnelConn`.
+- Expanded `pkg/wasm/dialer` package documentation with bounded-queue, event-loop, and deadline semantics.
+- Hardened `SECURITY.md` with a concrete private-disclosure channel (GitHub Security Advisories) and the automated gate list.
+
+### Repository
+
+- Added `.gitattributes` (LF normalization — fixes false gofmt diffs on Windows checkouts), `.editorconfig`, `CODE_OF_CONDUCT.md`, issue templates, a pull-request template, and Dependabot configuration (gomod + GitHub Actions, weekly).
+- Added a CodeQL analysis workflow and a CI job that executes the `pkg/grpctunnel` WASM test suite under Node (previously WASM code was compile-checked only).
+- Pruned stale internal process documents (Codex TODO scratch files, self-grading rubrics, host-repo submodule-era docs) from `docs/core/` and updated the docs index, catalog, and portal accordingly.
+
 ## [v0.1.0] - 2026-07-21
 
 ### Highlights

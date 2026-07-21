@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/monstercameron/GoGRPCBridge/security/advisories/new
+    about: Report security issues privately via GitHub Security Advisories, not public issues.
+  - name: Documentation
+    url: https://pkg.go.dev/github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel
+    about: API reference with runnable examples.

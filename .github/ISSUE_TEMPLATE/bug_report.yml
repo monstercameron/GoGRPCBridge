@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a defect in GoGRPCBridge
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug. The more precise the report, the faster the fix.
+  - type: input
+    id: version
+    attributes:
+      label: GoGRPCBridge version
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version and platform
+      placeholder: go1.25.8 linux/amd64 (server), go1.25.8 js/wasm (client)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Server bridge (pkg/grpctunnel server side)
+        - Native client (pkg/grpctunnel Dial)
+        - Browser WASM client
+        - Tooling helpers (reflection/health/pprof)
+        - CI / build / release
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include the exact error output or unexpected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Smallest server + client snippet (or steps) that reproduces the issue.
+      render: go
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true

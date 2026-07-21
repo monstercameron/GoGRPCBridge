@@ -1,217 +1,162 @@
-﻿[
+[
     {
-        "path":  "benchmarks/README.md",
-        "title":  "Benchmarks README",
-        "section":  "Benchmarks"
+        "path": "benchmarks/README.md",
+        "title": "Benchmarks README",
+        "section": "Benchmarks"
     },
     {
-        "path":  "core/ADOPTION_METRICS.md",
-        "title":  "Adoption Metrics",
-        "section":  "Core"
+        "path": "core/API_COMPATIBILITY.md",
+        "title": "Api Compatibility",
+        "section": "Core"
     },
     {
-        "path":  "core/API_COMPATIBILITY.md",
-        "title":  "Api Compatibility",
-        "section":  "Core"
+        "path": "core/AUTH_PROPAGATION_BOUNDARIES.md",
+        "title": "Auth Propagation Boundaries",
+        "section": "Core"
     },
     {
-        "path":  "core/AUTH_PROPAGATION_BOUNDARIES.md",
-        "title":  "Auth Propagation Boundaries",
-        "section":  "Core"
+        "path": "core/CANARY_AND_SMOKE.md",
+        "title": "Canary And Smoke",
+        "section": "Core"
     },
     {
-        "path":  "core/BACKLOG_FEEDBACK_LOOP.md",
-        "title":  "Backlog Feedback Loop",
-        "section":  "Core"
+        "path": "core/CHANGELOG.md",
+        "title": "Changelog",
+        "section": "Core"
     },
     {
-        "path":  "core/CANARY_AND_SMOKE.md",
-        "title":  "Canary And Smoke",
-        "section":  "Core"
+        "path": "core/COMMUNITY_WORKFLOW.md",
+        "title": "Community Workflow",
+        "section": "Core"
     },
     {
-        "path":  "core/CHANGELOG.md",
-        "title":  "Changelog",
-        "section":  "Core"
+        "path": "core/CONTRIBUTING.md",
+        "title": "Contributing",
+        "section": "Core"
     },
     {
-        "path":  "core/CODEX_LOGGING_OTEL_TODO.md",
-        "title":  "Codex Logging Otel Todo",
-        "section":  "Internal"
+        "path": "core/DOCS_FRESHNESS_POLICY.md",
+        "title": "Docs Freshness Policy",
+        "section": "Core"
     },
     {
-        "path":  "core/CODEX_SECURITY_TODO.md",
-        "title":  "Codex Security Todo",
-        "section":  "Internal"
+        "path": "core/DOCS_INDEX.md",
+        "title": "Docs Index",
+        "section": "Core"
     },
     {
-        "path":  "core/COMMUNITY_WORKFLOW.md",
-        "title":  "Community Workflow",
-        "section":  "Core"
+        "path": "core/GETTING_STARTED_ADVANCED.md",
+        "title": "Getting Started Advanced",
+        "section": "Core"
     },
     {
-        "path":  "core/CONTRIBUTING.md",
-        "title":  "Contributing",
-        "section":  "Core"
+        "path": "core/MAINTENANCE_SCHEDULE.md",
+        "title": "Maintenance Schedule",
+        "section": "Core"
     },
     {
-        "path":  "core/DOCS_FRESHNESS_POLICY.md",
-        "title":  "Docs Freshness Policy",
-        "section":  "Core"
+        "path": "core/MIGRATION.md",
+        "title": "Migration",
+        "section": "Core"
     },
     {
-        "path":  "core/DOCS_INDEX.md",
-        "title":  "Docs Index",
-        "section":  "Core"
+        "path": "core/MODULE_IDENTITY.md",
+        "title": "Module Identity",
+        "section": "Core"
     },
     {
-        "path":  "core/GETTING_STARTED_ADVANCED.md",
-        "title":  "Getting Started Advanced",
-        "section":  "Core"
+        "path": "core/OBSERVABILITY_CONTRACT.md",
+        "title": "Observability Contract",
+        "section": "Core"
     },
     {
-        "path":  "core/GETTING_STARTED_TODOS.md",
-        "title":  "Getting Started Todos",
-        "section":  "Core"
+        "path": "core/OPERATIONS_RUNBOOK.md",
+        "title": "Operations Runbook",
+        "section": "Core"
     },
     {
-        "path":  "core/GOGRPCBRIDGE_DEV_TO_PROD_ROADMAP.md",
-        "title":  "Gogrpcbridge Dev To Prod Roadmap",
-        "section":  "Core"
+        "path": "core/PERFORMANCE.md",
+        "title": "Performance",
+        "section": "Core"
     },
     {
-        "path":  "core/GOGRPCBRIDGE_INTEGRATION_MATRIX.md",
-        "title":  "Gogrpcbridge Integration Matrix",
-        "section":  "Core"
+        "path": "core/PERFORMANCE_OPTIMIZATION_NOTES.md",
+        "title": "Performance Optimization Notes",
+        "section": "Core"
     },
     {
-        "path":  "core/GOGRPCBRIDGE_REQUIRED_CHECKS.md",
-        "title":  "Gogrpcbridge Required Checks",
-        "section":  "Core"
+        "path": "core/QUALITY_GATES.md",
+        "title": "Quality Gates",
+        "section": "Core"
     },
     {
-        "path":  "core/GOGRPCBRIDGE_SUBMODULE_LIFECYCLE.md",
-        "title":  "Gogrpcbridge Submodule Lifecycle",
-        "section":  "Core"
+        "path": "core/README.md",
+        "title": "Core README",
+        "section": "Core"
     },
     {
-        "path":  "core/MAINTENANCE_SCHEDULE.md",
-        "title":  "Maintenance Schedule",
-        "section":  "Core"
+        "path": "core/RELEASE_CHECKLIST.md",
+        "title": "Release Checklist",
+        "section": "Core"
     },
     {
-        "path":  "core/MIGRATION.md",
-        "title":  "Migration",
-        "section":  "Core"
+        "path": "core/RELEASE_PERFORMANCE_TEMPLATE.md",
+        "title": "Release Performance Template",
+        "section": "Core"
     },
     {
-        "path":  "core/MODULE_IDENTITY.md",
-        "title":  "Module Identity",
-        "section":  "Core"
+        "path": "core/ROLLBACK_AND_HOTFIX.md",
+        "title": "Rollback And Hotfix",
+        "section": "Core"
     },
     {
-        "path":  "core/OBSERVABILITY_CONTRACT.md",
-        "title":  "Observability Contract",
-        "section":  "Core"
+        "path": "core/SECURITY_FUZZ_PROCESS.md",
+        "title": "Security Fuzz Process",
+        "section": "Core"
     },
     {
-        "path":  "core/OPERATIONS_RUNBOOK.md",
-        "title":  "Operations Runbook",
-        "section":  "Core"
+        "path": "core/SECURITY_RELEASE_CHECKLIST.md",
+        "title": "Security Release Checklist",
+        "section": "Core"
     },
     {
-        "path":  "core/PERFORMANCE.md",
-        "title":  "Performance",
-        "section":  "Core"
+        "path": "core/SLO_POLICY.md",
+        "title": "Slo Policy",
+        "section": "Core"
     },
     {
-        "path":  "core/PERFORMANCE_OPTIMIZATION_NOTES.md",
-        "title":  "Performance Optimization Notes",
-        "section":  "Core"
+        "path": "core/THREAT_MODEL.md",
+        "title": "Threat Model",
+        "section": "Core"
     },
     {
-        "path":  "core/PROFESSIONAL_RUBRIC.md",
-        "title":  "Professional Rubric",
-        "section":  "Internal"
+        "path": "core/TRIAGE_SLA.md",
+        "title": "Triage Sla",
+        "section": "Core"
     },
     {
-        "path":  "core/QUALITY_GATES.md",
-        "title":  "Quality Gates",
-        "section":  "Core"
+        "path": "core/TROUBLESHOOTING.md",
+        "title": "Troubleshooting",
+        "section": "Core"
     },
     {
-        "path":  "core/README.md",
-        "title":  "Core README",
-        "section":  "Core"
+        "path": "core/TUNNEL_STATE_DIAGNOSTICS.md",
+        "title": "Tunnel State Diagnostics",
+        "section": "Core"
     },
     {
-        "path":  "core/RELEASE_CHECKLIST.md",
-        "title":  "Release Checklist",
-        "section":  "Core"
+        "path": "examples/external-consumer/README.md",
+        "title": "External Consumer README",
+        "section": "Examples"
     },
     {
-        "path":  "core/RELEASE_PERFORMANCE_TEMPLATE.md",
-        "title":  "Release Performance Template",
-        "section":  "Core"
+        "path": "examples/README.md",
+        "title": "Examples README",
+        "section": "Examples"
     },
     {
-        "path":  "core/ROADMAP_TO_10S.md",
-        "title":  "Roadmap To 10S",
-        "section":  "Core"
-    },
-    {
-        "path":  "core/ROLLBACK_AND_HOTFIX.md",
-        "title":  "Rollback And Hotfix",
-        "section":  "Core"
-    },
-    {
-        "path":  "core/SECURITY_FUZZ_PROCESS.md",
-        "title":  "Security Fuzz Process",
-        "section":  "Core"
-    },
-    {
-        "path":  "core/SECURITY_RELEASE_CHECKLIST.md",
-        "title":  "Security Release Checklist",
-        "section":  "Core"
-    },
-    {
-        "path":  "core/SLO_POLICY.md",
-        "title":  "Slo Policy",
-        "section":  "Core"
-    },
-    {
-        "path":  "core/THREAT_MODEL.md",
-        "title":  "Threat Model",
-        "section":  "Core"
-    },
-    {
-        "path":  "core/TRIAGE_SLA.md",
-        "title":  "Triage Sla",
-        "section":  "Core"
-    },
-    {
-        "path":  "core/TROUBLESHOOTING.md",
-        "title":  "Troubleshooting",
-        "section":  "Core"
-    },
-    {
-        "path":  "core/TUNNEL_STATE_DIAGNOSTICS.md",
-        "title":  "Tunnel State Diagnostics",
-        "section":  "Core"
-    },
-    {
-        "path":  "examples/external-consumer/README.md",
-        "title":  "External Consumer README",
-        "section":  "Examples"
-    },
-    {
-        "path":  "examples/README.md",
-        "title":  "Examples README",
-        "section":  "Examples"
-    },
-    {
-        "path":  "observability/DASHBOARD_QUERIES.md",
-        "title":  "Dashboard Queries",
-        "section":  "Observability"
+        "path": "observability/DASHBOARD_QUERIES.md",
+        "title": "Dashboard Queries",
+        "section": "Observability"
     }
 ]

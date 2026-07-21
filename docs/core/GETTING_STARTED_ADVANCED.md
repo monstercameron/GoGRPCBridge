@@ -1,6 +1,6 @@
 # Getting Started Advanced
 
-This guide starts where [GETTING_STARTED_TODOS.md](./GETTING_STARTED_TODOS.md) ends.
+This guide assumes you have a working tunnel from the [README Quick Start](./README.md#quick-start).
 
 Goal: move from local proof-of-life to a production-ready operating posture.
 

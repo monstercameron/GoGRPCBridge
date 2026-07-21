@@ -1,30 +1,32 @@
 # GoGRPCBridge
 
-Native gRPC in the browser using WebSocket transport, without rewriting your service contracts.
+**Native gRPC in the browser** — run your existing gRPC services over WebSocket transport, with zero changes to your protobuf contracts.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/monstercameron/GoGRPCBridge.svg)](https://pkg.go.dev/github.com/monstercameron/GoGRPCBridge)
+[![Go Reference](https://pkg.go.dev/badge/github.com/monstercameron/GoGRPCBridge.svg)](https://pkg.go.dev/github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel)
 [![Test](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/test.yml/badge.svg)](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/test.yml)
 [![Release](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/release.yml/badge.svg)](https://github.com/monstercameron/GoGRPCBridge/actions/workflows/release.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/monstercameron/GoGRPCBridge)](https://goreportcard.com/report/github.com/monstercameron/GoGRPCBridge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-## What You Get
-
-- One public integration package for new work: `pkg/grpctunnel`.
-- Unary and streaming RPC support from `js/wasm` clients.
-- Server-side hardening hooks (origin policy, limits, connection controls).
-- CI quality gates for lint, race/coverage, security scanners, compile, and value-proposition benchmarks.
-
-## Architecture
+Browsers can't open raw TCP connections, so standard gRPC clients don't work in `js/wasm` builds. GoGRPCBridge tunnels HTTP/2 gRPC frames over a WebSocket, so your Go WASM frontend talks to your Go backend with **real gRPC** — unary, server-streaming, client-streaming, and bidirectional — not a REST shim or a gRPC-Web subset.
 
 ```text
-Browser WASM gRPC client
-  -> websocket (ws/wss)
-    -> grpctunnel bridge handler (Go HTTP server)
-      -> in-process grpc.Server
-        -> your existing protobuf services
+Browser (Go WASM gRPC client)
+  └─ WebSocket (ws:// or wss://)
+       └─ grpctunnel bridge handler (net/http)
+            └─ HTTP/2 ⇄ in-process grpc.Server
+                 └─ your existing protobuf services
 ```
 
-The project keeps your protobuf and generated client/server contracts intact. It only adapts transport for browser constraints.
+## Features
+
+- **Full gRPC semantics** — all four RPC types, deadlines, metadata, interceptors.
+- **Zero contract changes** — your `.proto` files and generated code stay untouched.
+- **One-line server integration** — `grpctunnel.Wrap(grpcServer)` is an `http.Handler`.
+- **Production hardening built in** — origin allowlists, pre-upgrade authorization, read limits, connection caps, upgrade rate limiting, keepalive.
+- **Graceful shutdown & TLS** — `NewServer` hands you the `*http.Server`; `ListenAndServeTLS` for one-liner `wss://`.
+- **Observability** — structured logs plus OpenTelemetry spans and metrics; W3C trace context forwarded into gRPC metadata.
+- **Flexible targets** — clients accept `ws://`, `wss://`, `http://`, `https://`, `host:port`, `:port`, and same-origin paths in the browser.
 
 ## Install
 
@@ -32,76 +34,36 @@ The project keeps your protobuf and generated client/server contracts intact. It
 go get github.com/monstercameron/GoGRPCBridge@latest
 ```
 
-Requires Go 1.25+ (see `go.mod` toolchain requirements).
+Requires Go 1.25+.
 
-## Module Identity
+## Quick Start
 
-- GitHub repository: `github.com/monstercameron/GoGRPCBridge`
-- Canonical Go module path: `github.com/monstercameron/GoGRPCBridge`
-
-The module path remains `github.com/monstercameron/GoGRPCBridge` for consumer compatibility and existing `go get` installs. Use the module path for imports and `go get`, and use `GoGRPCBridge` as the project/repository name.
-
-## Show, Not Tell: Minimal Integration
-
-### 1. Server bridge in front of your `grpc.Server`
+### Server
 
 ```go
 package main
 
 import (
-	"errors"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
 	"google.golang.org/grpc"
 )
 
-func authorize(r *http.Request) error {
-	if r.Header.Get("X-Bridge-Token") == "" {
-		return errors.New("missing bridge token")
-	}
-	return nil
-}
-
 func main() {
 	grpcServer := grpc.NewServer()
-	// Register generated services on grpcServer.
-
-	handler := grpctunnel.Wrap(
-		grpcServer,
-		grpctunnel.WithAllowedOrigins("https://app.example.com", "https://*.example.com"),
-		grpctunnel.WithAuthorize(authorize),
-		grpctunnel.WithKeepalive(30*time.Second, 2*time.Minute),
-		grpctunnel.WithReadLimitBytes(4<<20),
-		grpctunnel.WithMaxActiveConnections(2000),
-		grpctunnel.WithMaxConnectionsPerClient(20),
-		grpctunnel.WithMaxUpgradesPerClientPerMinute(60),
-	)
+	// proto.RegisterYourServiceServer(grpcServer, &yourImpl{})
 
 	mux := http.NewServeMux()
-	mux.Handle("/grpc", handler)
+	mux.Handle("/grpc", grpctunnel.Wrap(grpcServer))
+	mux.Handle("/", http.FileServer(http.Dir("./public"))) // serve your WASM app
 
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 ```
 
-For graceful shutdown or TLS termination, build the server yourself:
-
-```go
-srv := grpctunnel.NewServer(":8080", grpcServer,
-	grpctunnel.WithAllowedOrigins("https://app.example.com"),
-)
-go func() { log.Println(srv.ListenAndServe()) }()
-// ... on SIGTERM:
-_ = srv.Shutdown(ctx)
-
-// or one-liner TLS:
-// grpctunnel.ListenAndServeTLS(":443", "cert.pem", "key.pem", grpcServer)
-```
-
-### 2. Browser `js/wasm` gRPC client over tunnel
+### Browser client (`js/wasm`)
 
 ```go
 //go:build js && wasm
@@ -111,20 +73,19 @@ package main
 import (
 	"context"
 	"log"
-	"time"
 
 	pb "github.com/your-org/your-proto/gen"
 	"github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	conn, err := grpctunnel.BuildTunnelConn(ctx, grpctunnel.TunnelConfig{
-		Target:      "/grpc", // same-origin route on your host app
-		GRPCOptions: grpctunnel.ApplyTunnelInsecureCredentials(nil),
-	})
+	// Same-origin path: on https://example.com this dials wss://example.com/grpc.
+	// Transport-level TLS is managed by the browser; gRPC creds stay insecure.
+	conn, err := grpctunnel.Dial("/grpc",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -139,9 +100,64 @@ func main() {
 }
 ```
 
-## Evidence: Baseline Benchmark Snapshot
+### Native client (tests, CLIs, service-to-service)
 
-Source: `benchmarks/quality_baseline.json` (generated `2026-03-26T13:07:50Z`, `windows/amd64`, Go `1.25.0`).
+```go
+conn, err := grpctunnel.Dial("localhost:8080",
+	grpc.WithTransportCredentials(insecure.NewCredentials()),
+)
+```
+
+More runnable examples: [pkg.go.dev examples](https://pkg.go.dev/github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel#pkg-examples) and the [`examples/`](./examples) directory.
+
+## Production Hardening
+
+Every control is opt-in and composable:
+
+```go
+handler := grpctunnel.Wrap(grpcServer,
+	// Browser origin allowlist: exact origins and *. subdomain wildcards.
+	grpctunnel.WithAllowedOrigins("https://app.example.com", "https://*.staging.example.com"),
+
+	// Authorization before the websocket upgrade: failing requests get 403
+	// before any tunnel resources are allocated.
+	grpctunnel.WithAuthorize(func(r *http.Request) error {
+		return validateSession(r)
+	}),
+
+	// Transport bounds and liveness.
+	grpctunnel.WithReadLimitBytes(4<<20),
+	grpctunnel.WithKeepalive(30*time.Second, 2*time.Minute),
+
+	// Abuse controls.
+	grpctunnel.WithMaxActiveConnections(2000),
+	grpctunnel.WithMaxConnectionsPerClient(20),
+	grpctunnel.WithMaxUpgradesPerClientPerMinute(60),
+)
+```
+
+For graceful shutdown and TLS, own the server:
+
+```go
+srv := grpctunnel.NewServer(":8080", grpcServer, opts...)
+go srv.ListenAndServe()
+// on SIGTERM:
+srv.Shutdown(ctx)
+
+// or one-liner TLS:
+grpctunnel.ListenAndServeTLS(":443", "cert.pem", "key.pem", grpcServer, opts...)
+```
+
+Deployment notes:
+
+- A 16 MB websocket read limit applies by default even with no options set.
+- Requests without an `Origin` header (non-browser clients) pass origin checks by convention; use `WithAuthorize` for actual authentication.
+- Behind a reverse proxy, per-client caps key on the proxy's address — enforce per-user limits at the proxy in that topology.
+- Forwarded metadata (`x-request-id`, `x-correlation-id`, `traceparent`) is client-influenceable; treat it as diagnostics, not identity.
+
+## Performance
+
+Benchmarked against an equivalent REST/JSON transport (`benchmarks/quality_baseline.json`, windows/amd64):
 
 | Scenario | gRPC bridge | REST baseline | Delta |
 | --- | ---: | ---: | ---: |
@@ -150,51 +166,45 @@ Source: `benchmarks/quality_baseline.json` (generated `2026-03-26T13:07:50Z`, `w
 | Bidirectional 100 messages (`allocs/op`) | 5,333 | 10,854 | `-50.9%` |
 | Large dataset stream 1000 items (`B/op`) | 805,667 | 905,704 | `-11.0%` |
 
-This is why the project exists: keep gRPC semantics while reducing transport overhead in browser-driven workflows.
+The per-request forwarding path is allocation-free when tunneled requests already carry trace/request metadata, and the bridge shares websocket write-buffer pools across connections. CI enforces benchmark trend gates against the recorded baseline on every release.
 
-## Production Guardrails You Can Enforce
+## API Overview
 
-- Origin allow-list with `WithAllowedOrigins` (exact and `*.` subdomain wildcards) or a custom `WithOriginCheck`.
-- Pre-upgrade authorization with `WithAuthorize` (rejects with 403 before any websocket or gRPC resources are allocated).
-- Frame/read bounds with `WithReadLimitBytes` (or explicit disable only when upstream bounds exist).
-- Abuse controls with:
-  - `WithMaxActiveConnections`
-  - `WithMaxConnectionsPerClient`
-  - `WithMaxUpgradesPerClientPerMinute`
-- Keepalive and idle behavior with `WithKeepalive`.
-- Structured logs plus OpenTelemetry span/metric integration in the canonical path (`pkg/grpctunnel`).
+| Need | Use |
+| --- | --- |
+| Mount the bridge as middleware | `Wrap(grpcServer, opts...)` |
+| Typed config + error handling | `BuildBridgeHandler(grpcServer, BridgeConfig)` |
+| Shutdown-capable server | `NewServer(addr, grpcServer, opts...)` |
+| One-liner startup | `ListenAndServe` / `ListenAndServeTLS` / `Serve` |
+| Dial from browser or native Go | `Dial` / `DialContext` / `BuildTunnelConn` |
+| Origin policy | `WithAllowedOrigins` / `WithOriginCheck` / `BuildOriginAllowlistCheck` |
+| Pre-upgrade auth | `WithAuthorize` |
+| Reconnect tuning | `WithReconnectPolicy` / `ReconnectConfig` |
+| grpcurl / grpcui / pprof side-channel | `BuildToolingHandler` / `ListenAndServeTooling` |
 
-## Quality and Security Gates
+`pkg/grpctunnel` is the supported public API. `pkg/bridge` (low-level reverse-proxy primitives) is deprecated; see the [migration guide](./docs/core/MIGRATION.md).
 
-Run from this repository root (`third_party/GoGRPCBridge`):
+## Quality Gates
+
+Every push runs lint, race + coverage (≥90% enforced), fuzz seed corpus, Playwright browser e2e, `gosec`, and `govulncheck`. Releases additionally enforce API-compatibility governance, benchmark trend gates, changelog validation, and clean-consumer install smoke tests.
 
 ```bash
-go run ./tools/runner.go quality
-go run ./tools/runner.go quality-trend
-go run ./tools/runner.go canonical-publish-check
+go run ./tools/runner.go quality                 # local quality gates
+go run ./tools/runner.go canonical-publish-check # module identity + consumer smoke
 ```
 
-`canonical-publish-check` verifies module path alignment, canonical repository identity (`GoGRPCBridge`), and a clean-consumer `go get` + compile smoke test.
+## Documentation
 
-Release workflow also enforces:
+- [Docs index](./docs/core/DOCS_INDEX.md) — all technical docs
+- [Migration guide](./docs/core/MIGRATION.md) — typed API migration and behavior changes
+- [Threat model](./docs/core/THREAT_MODEL.md) and [security policy](./SECURITY.md)
+- [Operations runbook](./docs/core/OPERATIONS_RUNBOOK.md) and [troubleshooting](./docs/core/TROUBLESHOOTING.md)
+- [Changelog](./docs/core/CHANGELOG.md)
 
-- `gosec` high-severity/high-confidence policy
-- `govulncheck`
-- API governance checks
-- compile verification
-- benchmark trend artifact generation
+## Contributing
 
-## Documentation Map
+Issues and PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md). Run `go run ./tools/runner.go quality` before submitting.
 
-- Core technical docs: [docs/core/README.md](./docs/core/README.md)
-- Docs index: [docs/core/DOCS_INDEX.md](./docs/core/DOCS_INDEX.md)
-- Module/repository identity policy: [docs/core/MODULE_IDENTITY.md](./docs/core/MODULE_IDENTITY.md)
-- Threat model: [docs/core/THREAT_MODEL.md](./docs/core/THREAT_MODEL.md)
-- Security release checklist: [docs/core/SECURITY_RELEASE_CHECKLIST.md](./docs/core/SECURITY_RELEASE_CHECKLIST.md)
-- Performance notes: [docs/core/PERFORMANCE_OPTIMIZATION_NOTES.md](./docs/core/PERFORMANCE_OPTIMIZATION_NOTES.md)
-- Examples catalog: [docs/examples/README.md](./docs/examples/README.md)
-- Changelog: [docs/core/CHANGELOG.md](./docs/core/CHANGELOG.md)
-- Public docs portal: [docs/index.html](./docs/index.html)
-- Contributing: [CONTRIBUTING.md](./CONTRIBUTING.md)
-- Security policy: [SECURITY.md](./SECURITY.md)
-- License: [LICENSE](./LICENSE)
+## License
+
+[MIT](./LICENSE)
