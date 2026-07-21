@@ -2,6 +2,13 @@
 
 This guide covers migration to the typed `grpctunnel` API.
 
+## v0.2.0 Behavior Changes
+
+- **Server keepalive is now on by default** (30s websocket ping, 120s idle timeout) so silently dead clients are reclaimed instead of pinning resources until the OS TCP timeout. If a proxy in front of the bridge owns connection liveness, restore the old behavior with `WithKeepaliveDisabled()` (or `BridgeConfig.ShouldDisableKeepalive`). Setting explicit `WithKeepalive` values together with `WithKeepaliveDisabled` is now a validation error.
+- Long-lived tunnels idle for more than 120 seconds whose clients do not answer websocket pings will now be closed. Standard clients (browsers, gorilla) answer pings automatically; only hand-rolled websocket clients that ignore ping frames are affected.
+
+New in v0.2.0 (additive): `WithNativeGRPCTransport`/`BridgeConfig.ShouldUseNativeGRPCTransport` (serve sessions via gRPC's native HTTP/2 transport; −47% memory per RPC, no upgrade-header forwarding), `WithTunnelKeepalive`/`TunnelConfig.KeepaliveConfig`/`ApplyTunnelKeepalivePolicy` (client dead-connection detection), and `WithKeepaliveDisabled`. See [CONNECTION_LIFECYCLE.md](./CONNECTION_LIFECYCLE.md).
+
 ## v0.1.0 Behavior Changes
 
 No exported API was renamed or removed in v0.1.0. Behavior deltas to review:

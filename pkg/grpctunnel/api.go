@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	grpcbackoff "google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 )
 
 // TunnelConfig configures typed client connection creation for grpctunnel.
@@ -37,8 +38,22 @@ type TunnelConfig struct {
 	ShouldEnableCompression bool
 	// ReconnectConfig configures optional gRPC reconnect and backoff behavior.
 	ReconnectConfig *ReconnectConfig
+	// KeepaliveConfig configures optional client-side gRPC keepalive probing
+	// over the tunnel, which detects silently dead connections (NAT resets,
+	// dropped networks) and triggers automatic reconnection.
+	KeepaliveConfig *KeepaliveConfig
 	// GRPCOptions passes through grpc.DialOption values.
 	GRPCOptions []grpc.DialOption
+}
+
+// KeepaliveConfig configures client-side gRPC keepalive over the tunnel.
+type KeepaliveConfig struct {
+	// Interval is how often to probe an idle connection with HTTP/2 pings.
+	// gRPC enforces a 10s minimum. Zero uses 30s.
+	Interval time.Duration
+	// Timeout is how long to wait for a ping ack before declaring the
+	// connection dead and reconnecting. Zero uses 20s.
+	Timeout time.Duration
 }
 
 // BridgeConfig configures typed server handler creation for grpctunnel.
@@ -62,10 +77,26 @@ type BridgeConfig struct {
 	// ShouldDisableReadLimit disables websocket read-size limiting.
 	// Use this only when an upstream boundary enforces strict payload limits.
 	ShouldDisableReadLimit bool
-	// PingInterval configures optional server-initiated websocket ping cadence.
+	// PingInterval configures server-initiated websocket ping cadence.
+	// When PingInterval and IdleTimeout are both zero and keepalive is not
+	// disabled, secure defaults apply (30s ping, 120s idle timeout) so dead
+	// peers cannot pin server resources indefinitely.
 	PingInterval time.Duration
-	// IdleTimeout configures how long the bridge waits for client activity or pong frames.
+	// IdleTimeout configures how long the bridge waits for client activity or
+	// pong frames before closing the connection. See PingInterval for defaults.
 	IdleTimeout time.Duration
+	// ShouldDisableKeepalive turns off the default server keepalive probing.
+	// Without keepalive, silently dropped clients hold connection slots until
+	// the OS TCP timeout; disable only when an upstream boundary owns liveness.
+	ShouldDisableKeepalive bool
+	// ShouldUseNativeGRPCTransport serves tunneled sessions through
+	// grpc.Server.Serve and gRPC's own HTTP/2 transport instead of the
+	// net/http handler path. This is significantly cheaper per RPC (fewer
+	// allocations, native flow control, server-side gRPC keepalive support)
+	// with two tradeoffs: upgrade-request headers are not forwarded into
+	// per-RPC metadata, and the grpc.Server must not have transport
+	// credentials configured (TLS belongs on the websocket listener).
+	ShouldUseNativeGRPCTransport bool
 	// ShouldEnableCompression enables websocket per-message compression where supported.
 	ShouldEnableCompression bool
 	// MaxActiveConnections limits total concurrent websocket tunnel connections.
@@ -194,6 +225,43 @@ func GetReconnectConfigError(cfg ReconnectConfig) error {
 		return fmt.Errorf("grpctunnel: reconnect Jitter must be finite")
 	}
 	return nil
+}
+
+// GetKeepaliveConfigError validates optional client keepalive settings.
+func GetKeepaliveConfigError(cfg KeepaliveConfig) error {
+	if cfg.Interval < 0 {
+		return fmt.Errorf("grpctunnel: keepalive Interval must be >= 0")
+	}
+	if cfg.Timeout < 0 {
+		return fmt.Errorf("grpctunnel: keepalive Timeout must be >= 0")
+	}
+	return nil
+}
+
+// ApplyTunnelKeepalivePolicy appends client keepalive dial options onto an
+// option slice. Probing runs even without active streams so idle tunnels
+// detect dead connections and reconnect.
+func ApplyTunnelKeepalivePolicy(dialOptions []grpc.DialOption, cfg KeepaliveConfig) ([]grpc.DialOption, error) {
+	if err := GetKeepaliveConfigError(cfg); err != nil {
+		return nil, err
+	}
+
+	interval := cfg.Interval
+	if interval == 0 {
+		interval = 30 * time.Second
+	}
+	timeout := cfg.Timeout
+	if timeout == 0 {
+		timeout = 20 * time.Second
+	}
+
+	result := append([]grpc.DialOption{}, dialOptions...)
+	result = append(result, grpc.WithKeepaliveParams(keepalive.ClientParameters{
+		Time:                interval,
+		Timeout:             timeout,
+		PermitWithoutStream: true,
+	}))
+	return result, nil
 }
 
 // ApplyTunnelReconnectPolicy appends reconnect dial options onto an option slice.

@@ -6,6 +6,26 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-07-21
+
+### Highlights
+
+- Runtime-cost and connection-lifecycle release: native gRPC transport mode (−47% memory per RPC), server keepalive on by default (dead peers reclaimed automatically), and a complete client keepalive + reconnection story.
+
+### Added
+
+- `WithNativeGRPCTransport` / `BridgeConfig.ShouldUseNativeGRPCTransport` — serves tunneled sessions through `grpc.Server.Serve` and gRPC's native HTTP/2 transport instead of the `net/http` handler path: **9.2 KB / 163 allocs per unary RPC vs 17.3 KB / 228** (−47% bytes, −28% allocs), ~20% faster server-stream drains, native flow control, and gRPC server keepalive support. Tradeoffs (no upgrade-header forwarding; no transport credentials on the `grpc.Server`) are documented. Verified for unary, server-streaming, and bidirectional RPCs plus concurrent clients.
+- `WithTunnelKeepalive` / `TunnelConfig.KeepaliveConfig` / `ApplyTunnelKeepalivePolicy` — client-side gRPC keepalive over the tunnel (native and WASM builds): detects silently dead connections (NAT resets, dropped networks) and triggers automatic reconnection even with no active streams.
+- `WithKeepaliveDisabled` / `BridgeConfig.ShouldDisableKeepalive` — explicit opt-out of server keepalive probing.
+- `docs/core/CONNECTION_LIFECYCLE.md` — authoritative connect/disconnect/timeout/reconnect guide: keepalive matrix, disconnect-detection paths, reconnection tuning, browser caveats, recommended production configuration, and transport-mode comparison.
+- Lifecycle test suite: dead-peer reclamation, server-restart reconnection (`WaitForReady`), keepalive defaulting rules, native-transport end-to-end and concurrency tests, and transport-mode benchmarks.
+
+### Changed
+
+- **Server keepalive defaults on** (30s ping / 120s idle) when not explicitly configured — silently dead clients previously pinned connection slots and goroutines until the OS TCP timeout. Disable with `WithKeepaliveDisabled()` when an upstream boundary owns liveness.
+- Handler-mode serving drops the redundant `h2c` upgrade shim (requests inside `ServeConn` are already HTTP/2), removing a per-request indirection.
+- CI: bumped `playwright-go` to v0.6000.0 — the 1.52 driver's `playwright.azureedge.net` CDN was retired and returned 404s, breaking every e2e lane.
+
 ## [v0.1.1] - 2026-07-21
 
 ### Highlights

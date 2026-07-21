@@ -30,6 +30,7 @@ type clientOptions struct {
 	setTunnelSubprotocols   []string
 	setTunnelProxy          func(*http.Request) (*url.URL, error)
 	setTunnelReconnect      *ReconnectConfig
+	setTunnelKeepalive      *KeepaliveConfig
 	setTunnelTimeout        time.Duration
 	shouldEnableCompression bool
 }
@@ -98,6 +99,17 @@ func WithReconnectPolicy(cfg ReconnectConfig) ClientOption {
 	return func(o *clientOptions) {
 		reconnectConfig := cfg
 		o.setTunnelReconnect = &reconnectConfig
+	}
+}
+
+// WithTunnelKeepalive enables client-side gRPC keepalive probing over the
+// tunnel. Probes detect silently dead connections (NAT resets, dropped
+// networks, sleeping devices) and trigger automatic reconnection even with
+// no active streams. interval zero uses 30s; timeout zero uses 20s. Note
+// that background browser tabs may throttle timers, delaying probes.
+func WithTunnelKeepalive(interval time.Duration, timeout time.Duration) ClientOption {
+	return func(o *clientOptions) {
+		o.setTunnelKeepalive = &KeepaliveConfig{Interval: interval, Timeout: timeout}
 	}
 }
 
@@ -224,6 +236,11 @@ func getTunnelConfigErrorWithoutTarget(cfg TunnelConfig) error {
 			return err
 		}
 	}
+	if cfg.KeepaliveConfig != nil {
+		if err := GetKeepaliveConfigError(*cfg.KeepaliveConfig); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -253,13 +270,20 @@ func BuildTunnelConn(ctx context.Context, cfg TunnelConfig) (*grpc.ClientConn, e
 		return nil, err
 	}
 
-	dialOptions := make([]grpc.DialOption, 0, len(cfg.GRPCOptions)+2)
+	dialOptions := make([]grpc.DialOption, 0, len(cfg.GRPCOptions)+3)
 	if cfg.ReconnectConfig != nil {
 		reconnectOptions, err := ApplyTunnelReconnectPolicy(nil, *cfg.ReconnectConfig)
 		if err != nil {
 			return nil, err
 		}
 		dialOptions = append(dialOptions, reconnectOptions...)
+	}
+	if cfg.KeepaliveConfig != nil {
+		keepaliveOptions, err := ApplyTunnelKeepalivePolicy(nil, *cfg.KeepaliveConfig)
+		if err != nil {
+			return nil, err
+		}
+		dialOptions = append(dialOptions, keepaliveOptions...)
 	}
 	dialOptions = append(dialOptions, cfg.GRPCOptions...)
 	dialOptions = append(dialOptions, dialer.NewWithConfig(tunnelURL, dialer.Config{
@@ -332,6 +356,7 @@ func DialContext(ctx context.Context, target string, opts ...interface{}) (*grpc
 		HandshakeTimeout:        tunnelOptions.setTunnelTimeout,
 		ShouldEnableCompression: tunnelOptions.shouldEnableCompression,
 		ReconnectConfig:         tunnelOptions.setTunnelReconnect,
+		KeepaliveConfig:         tunnelOptions.setTunnelKeepalive,
 		GRPCOptions:             grpcOpts,
 	})
 }

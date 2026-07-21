@@ -23,7 +23,9 @@ Browser (Go WASM gRPC client)
 - **Full gRPC semantics** — all four RPC types, deadlines, metadata, interceptors.
 - **Zero contract changes** — your `.proto` files and generated code stay untouched.
 - **One-line server integration** — `grpctunnel.Wrap(grpcServer)` is an `http.Handler`.
-- **Production hardening built in** — origin allowlists, pre-upgrade authorization, read limits, connection caps, upgrade rate limiting, keepalive.
+- **Production hardening built in** — origin allowlists, pre-upgrade authorization, read limits, connection caps, upgrade rate limiting.
+- **Liveness by default** — server keepalive (30s ping / 120s idle) reclaims dead peers automatically; client-side `WithTunnelKeepalive` + `WithReconnectPolicy` give transparent reconnection. See the [connection lifecycle guide](./docs/core/CONNECTION_LIFECYCLE.md).
+- **Native transport mode** — `WithNativeGRPCTransport()` serves sessions through gRPC's own HTTP/2 transport: −47% memory and −28% allocations per RPC versus the handler path.
 - **Graceful shutdown & TLS** — `NewServer` hands you the `*http.Server`; `ListenAndServeTLS` for one-liner `wss://`.
 - **Observability** — structured logs plus OpenTelemetry spans and metrics; W3C trace context forwarded into gRPC metadata.
 - **Flexible targets** — clients accept `ws://`, `wss://`, `http://`, `https://`, `host:port`, `:port`, and same-origin paths in the browser.
@@ -166,7 +168,7 @@ Benchmarked against an equivalent REST/JSON transport (`benchmarks/quality_basel
 | Bidirectional 100 messages (`allocs/op`) | 5,333 | 10,854 | `-50.9%` |
 | Large dataset stream 1000 items (`B/op`) | 805,667 | 905,704 | `-11.0%` |
 
-The per-request forwarding path is allocation-free when tunneled requests already carry trace/request metadata, and the bridge shares websocket write-buffer pools across connections. CI enforces benchmark trend gates against the recorded baseline on every release.
+The per-request forwarding path is allocation-free when tunneled requests already carry trace/request metadata, and the bridge shares websocket write-buffer pools across connections. Opting into `WithNativeGRPCTransport()` serves sessions through gRPC's native HTTP/2 transport for a further **−47% bytes and −28% allocations per unary RPC** (9.2 KB/163 allocs vs 17.3 KB/228) and ~20% faster server-stream drains — see [CONNECTION_LIFECYCLE.md](./docs/core/CONNECTION_LIFECYCLE.md) for the tradeoffs. CI enforces benchmark trend gates against the recorded baseline on every release.
 
 ## API Overview
 
@@ -179,6 +181,8 @@ The per-request forwarding path is allocation-free when tunneled requests alread
 | Dial from browser or native Go | `Dial` / `DialContext` / `BuildTunnelConn` |
 | Origin policy | `WithAllowedOrigins` / `WithOriginCheck` / `BuildOriginAllowlistCheck` |
 | Pre-upgrade auth | `WithAuthorize` |
+| Cheapest per-RPC serving path | `WithNativeGRPCTransport` |
+| Keepalive / dead-peer detection | server default (or `WithKeepalive`), client `WithTunnelKeepalive` |
 | Reconnect tuning | `WithReconnectPolicy` / `ReconnectConfig` |
 | grpcurl / grpcui / pprof side-channel | `BuildToolingHandler` / `ListenAndServeTooling` |
 

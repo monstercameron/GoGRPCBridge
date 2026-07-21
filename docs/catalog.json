@@ -30,6 +30,11 @@
         "section": "Core"
     },
     {
+        "path": "core/CONNECTION_LIFECYCLE.md",
+        "title": "Connection Lifecycle",
+        "section": "Core"
+    },
+    {
         "path": "core/CONTRIBUTING.md",
         "title": "Contributing",
         "section": "Core"
@@ -145,13 +150,13 @@
         "section": "Core"
     },
     {
-        "path": "examples/external-consumer/README.md",
-        "title": "External Consumer README",
+        "path": "examples/README.md",
+        "title": "Examples README",
         "section": "Examples"
     },
     {
-        "path": "examples/README.md",
-        "title": "Examples README",
+        "path": "examples/external-consumer/README.md",
+        "title": "External Consumer README",
         "section": "Examples"
     },
     {

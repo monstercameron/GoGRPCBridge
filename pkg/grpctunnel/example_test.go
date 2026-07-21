@@ -79,6 +79,36 @@ func ExampleWithAllowedOrigins() {
 	_ = handler
 }
 
+// ExampleWithTunnelKeepalive shows a resilient client: keepalive probing
+// detects dead connections and reconnect backoff re-establishes the tunnel.
+func ExampleWithTunnelKeepalive() {
+	conn, err := grpctunnel.Dial("wss://api.example.com/grpc",
+		grpctunnel.WithTunnelKeepalive(30*time.Second, 20*time.Second),
+		grpctunnel.WithReconnectPolicy(grpctunnel.ReconnectConfig{
+			MaxDelay: 30 * time.Second,
+		}),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer conn.Close()
+}
+
+// ExampleWithNativeGRPCTransport shows the cheapest serving path: sessions go
+// through gRPC's own HTTP/2 transport (−47% memory per RPC). Upgrade-request
+// headers are not forwarded into per-RPC metadata in this mode.
+func ExampleWithNativeGRPCTransport() {
+	grpcServer := grpc.NewServer() // no transport credentials in native mode
+
+	handler := grpctunnel.Wrap(grpcServer,
+		grpctunnel.WithNativeGRPCTransport(),
+		grpctunnel.WithAllowedOrigins("https://app.example.com"),
+	)
+	_ = handler
+}
+
 // ExampleDial shows the client side: dial the bridge like any gRPC target.
 // ws://, wss://, http://, https://, host:port, and :port all work.
 func ExampleDial() {

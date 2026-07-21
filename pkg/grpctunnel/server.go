@@ -14,7 +14,6 @@ import (
 	"github.com/gorilla/websocket"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 )
 
@@ -31,20 +30,22 @@ var cacheWebSocketWriteBufferPools sync.Map
 type ServerOption func(*serverOptions)
 
 type serverOptions struct {
-	checkOrigin             func(r *http.Request) bool
-	authorize               func(r *http.Request) error
-	readBufferSize          int
-	writeBufferSize         int
-	readLimitBytes          int64
-	shouldDisableReadLimit  bool
-	pingInterval            time.Duration
-	idleTimeout             time.Duration
-	onConnect               func(r *http.Request)
-	onDisconnect            func(r *http.Request)
-	shouldEnableCompression bool
-	maxActiveConnections    int
-	maxConnectionsPerClient int
-	maxUpgradesPerClient    int
+	checkOrigin              func(r *http.Request) bool
+	authorize                func(r *http.Request) error
+	readBufferSize           int
+	writeBufferSize          int
+	readLimitBytes           int64
+	shouldDisableReadLimit   bool
+	pingInterval             time.Duration
+	idleTimeout              time.Duration
+	shouldDisableKeepalive   bool
+	shouldUseNativeTransport bool
+	onConnect                func(r *http.Request)
+	onDisconnect             func(r *http.Request)
+	shouldEnableCompression  bool
+	maxActiveConnections     int
+	maxConnectionsPerClient  int
+	maxUpgradesPerClient     int
 }
 
 // buildWebSocketWriteBufferPool returns a shared pool for a websocket write-buffer size.
@@ -130,10 +131,30 @@ func WithReadLimitDisabled() ServerOption {
 }
 
 // WithKeepalive enables server-side websocket ping and idle timeout handling.
+// When neither WithKeepalive nor WithKeepaliveDisabled is used, secure
+// defaults apply (30s ping, 120s idle timeout).
 func WithKeepalive(pingInterval time.Duration, idleTimeout time.Duration) ServerOption {
 	return func(o *serverOptions) {
 		o.pingInterval = pingInterval
 		o.idleTimeout = idleTimeout
+	}
+}
+
+// WithKeepaliveDisabled turns off default server keepalive probing. Without
+// keepalive, silently dropped clients hold connection slots until the OS TCP
+// timeout; disable only when an upstream boundary owns connection liveness.
+func WithKeepaliveDisabled() ServerOption {
+	return func(o *serverOptions) {
+		o.shouldDisableKeepalive = true
+	}
+}
+
+// WithNativeGRPCTransport serves tunneled sessions through grpc.Server.Serve
+// and gRPC's own HTTP/2 transport instead of the net/http handler path. See
+// BridgeConfig.ShouldUseNativeGRPCTransport for the tradeoffs.
+func WithNativeGRPCTransport() ServerOption {
+	return func(o *serverOptions) {
+		o.shouldUseNativeTransport = true
 	}
 }
 
@@ -205,6 +226,9 @@ func GetBridgeConfigError(cfg BridgeConfig) error {
 	if cfg.IdleTimeout > 0 && cfg.PingInterval >= cfg.IdleTimeout {
 		return fmt.Errorf("grpctunnel: PingInterval must be less than IdleTimeout")
 	}
+	if cfg.ShouldDisableKeepalive && (cfg.PingInterval > 0 || cfg.IdleTimeout > 0) {
+		return fmt.Errorf("grpctunnel: PingInterval/IdleTimeout cannot be set when ShouldDisableKeepalive is true")
+	}
 	if cfg.MaxActiveConnections < 0 {
 		return fmt.Errorf("grpctunnel: MaxActiveConnections must be >= 0")
 	}
@@ -215,6 +239,23 @@ func GetBridgeConfigError(cfg BridgeConfig) error {
 		return fmt.Errorf("grpctunnel: MaxUpgradesPerClientPerMinute must be >= 0")
 	}
 	return nil
+}
+
+// Default keepalive cadence applied when the caller configures neither
+// explicit keepalive values nor ShouldDisableKeepalive. 30s pings survive
+// common proxy and NAT idle windows; a dead peer is reclaimed within 120s.
+const defaultBridgePingInterval = 30 * time.Second
+const defaultBridgeIdleTimeout = 120 * time.Second
+
+// applyBridgeKeepaliveDefaults fills in default keepalive probing when the
+// caller neither configured keepalive nor disabled it.
+func applyBridgeKeepaliveDefaults(cfg BridgeConfig) BridgeConfig {
+	if cfg.ShouldDisableKeepalive || cfg.PingInterval > 0 || cfg.IdleTimeout > 0 {
+		return cfg
+	}
+	cfg.PingInterval = defaultBridgePingInterval
+	cfg.IdleTimeout = defaultBridgeIdleTimeout
+	return cfg
 }
 
 // applyBridgeConnectionSettings applies optional websocket limits and keepalive behavior.
@@ -433,6 +474,7 @@ func BuildBridgeHandler(grpcServer *grpc.Server, cfg BridgeConfig) (http.Handler
 	if err := GetBridgeConfigError(cfg); err != nil {
 		return nil, err
 	}
+	cfg = applyBridgeKeepaliveDefaults(cfg)
 
 	readBufferSize := cfg.ReadBufferSize
 	if readBufferSize == 0 {
@@ -451,10 +493,24 @@ func BuildBridgeHandler(grpcServer *grpc.Server, cfg BridgeConfig) (http.Handler
 		CheckOrigin:       cfg.CheckOrigin,
 		EnableCompression: cfg.ShouldEnableCompression,
 	}
+	// Inside ServeConn every request is already HTTP/2, so the gRPC server's
+	// ServeHTTP handles them directly; no h2c upgrade shim is needed.
 	http2Server := &http2.Server{}
-	serveH2CHandler := h2c.NewHandler(grpcServer, http2Server)
 	observability := buildBridgeObservability()
 	abuseGuard := buildBridgeAbuseGuard(cfg)
+
+	// Native mode feeds upgraded connections to grpc.Server.Serve so gRPC's
+	// own HTTP/2 transport handles the session. The serve loop runs for the
+	// handler's lifetime; grpcServer.Stop/GracefulStop closes the listener.
+	var nativeListener *bridgeConnListener
+	if cfg.ShouldUseNativeGRPCTransport {
+		nativeListener = newBridgeConnListener()
+		go func() {
+			if err := grpcServer.Serve(nativeListener); err != nil && err != grpc.ErrServerStopped {
+				logGrpctunnelEvent("grpctunnel.bridge", "WARN", "native_serve_stopped", nil, err, "Native gRPC serve loop stopped")
+			}
+		}()
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgradeStart := time.Now()
@@ -515,8 +571,22 @@ func BuildBridgeHandler(grpcServer *grpc.Server, cfg BridgeConfig) (http.Handler
 		// Wrap WebSocket as net.Conn
 		conn := newWebSocketConn(ws)
 		defer conn.Close()
+
+		if nativeListener != nil {
+			// Hand the session to gRPC's native HTTP/2 transport and block
+			// until the transport closes it, so disconnect hooks, metrics,
+			// and abuse-guard release fire at the true end of the session.
+			session := newNotifyCloseConn(conn)
+			if !nativeListener.deliver(session) {
+				logGrpctunnelEvent("grpctunnel.bridge", "WARN", "native_serve_unavailable", r, nil, "gRPC server stopped; rejecting tunneled session")
+				return
+			}
+			<-session.done
+			return
+		}
+
 		forwardHeaders := buildBridgeForwardHeaders(r, sessionContext)
-		forwardHandler := wrapBridgeForwardMetadataHandler(serveH2CHandler, forwardHeaders)
+		forwardHandler := wrapBridgeForwardMetadataHandler(grpcServer, forwardHeaders)
 
 		// Serve gRPC over HTTP/2 on the WebSocket connection
 		http2Server.ServeConn(conn, &http2.ServeConnOpts{
@@ -567,6 +637,8 @@ func buildBridgeConfig(options *serverOptions) BridgeConfig {
 		ShouldDisableReadLimit:        options.shouldDisableReadLimit,
 		PingInterval:                  options.pingInterval,
 		IdleTimeout:                   options.idleTimeout,
+		ShouldDisableKeepalive:        options.shouldDisableKeepalive,
+		ShouldUseNativeGRPCTransport:  options.shouldUseNativeTransport,
 		ShouldEnableCompression:       options.shouldEnableCompression,
 		MaxActiveConnections:          options.maxActiveConnections,
 		MaxConnectionsPerClient:       options.maxConnectionsPerClient,
