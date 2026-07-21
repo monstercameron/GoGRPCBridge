@@ -91,12 +91,12 @@ jobs:
         run: go test ./pkg/... -v -run "Edge|Mock" -timeout 2m
 
       - name: Run fuzz tests (seed corpus only)
-        run: |
-          # Run each fuzzer briefly to validate seed corpus.
-          go test ./pkg/bridge -v -fuzz=FuzzWebSocketConnWrite -fuzztime=5s
-          go test ./pkg/bridge -v -fuzz=FuzzWebSocketConnRead -fuzztime=5s
-          go test ./pkg/bridge -v -fuzz=FuzzBinaryMessage -fuzztime=5s
-          go test ./pkg/bridge -v -fuzz=FuzzMessageSizes -fuzztime=5s
+        # -run executes every fuzz target's seed corpus deterministically
+        # without the fuzz engine. Timed fuzzing (-fuzz -fuzztime) is flaky at
+        # the fuzztime boundary on loaded runners ("context deadline exceeded"
+        # from the engine's worker shutdown); deep fuzzing runs are covered by
+        # docs/core/SECURITY_FUZZ_PROCESS.md instead.
+        run: go test ./pkg/bridge ./pkg/grpctunnel -v -run '^Fuzz' -timeout 5m
 
       - name: Install Playwright
         run: |
