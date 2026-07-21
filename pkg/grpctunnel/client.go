@@ -38,240 +38,257 @@ type clientOptions struct {
 //
 // Example:
 //
-//	conn, _ := grpctunnel.Dial("localhost:8080",
-//	    grpctunnel.WithTLS(&tls.Config{InsecureSkipVerify: true}),
+//	conn, _ := grpctunnel.Dial("api.example.com:443",
+//	    grpctunnel.WithTLS(nil), // wss:// with default TLS verification
 //	)
-func WithTLS(parseConfig *tls.Config) ClientOption {
-	return func(parseO *clientOptions) {
-		parseO.isUseTLS = true
-		parseO.tlsConfig = parseConfig
+func WithTLS(cfg *tls.Config) ClientOption {
+	return func(o *clientOptions) {
+		o.isUseTLS = true
+		o.tlsConfig = cfg
 	}
 }
 
 // WithHeaders configures websocket handshake headers.
-func WithHeaders(parseHeaders http.Header) ClientOption {
-	return func(parseO *clientOptions) {
-		parseO.setTunnelHeaders = parseHeaders.Clone()
+func WithHeaders(headers http.Header) ClientOption {
+	return func(o *clientOptions) {
+		o.setTunnelHeaders = headers.Clone()
 	}
 }
 
 // WithHeader appends one websocket handshake header value.
-func WithHeader(parseKey string, parseValue string) ClientOption {
-	return func(parseO *clientOptions) {
-		if parseO.setTunnelHeaders == nil {
-			parseO.setTunnelHeaders = make(http.Header)
+func WithHeader(key string, value string) ClientOption {
+	return func(o *clientOptions) {
+		if o.setTunnelHeaders == nil {
+			o.setTunnelHeaders = make(http.Header)
 		}
-		parseO.setTunnelHeaders.Add(parseKey, parseValue)
+		o.setTunnelHeaders.Add(key, value)
 	}
 }
 
 // WithSubprotocols configures websocket subprotocol negotiation.
-func WithSubprotocols(parseSubprotocols ...string) ClientOption {
-	return func(parseO *clientOptions) {
-		parseO.setTunnelSubprotocols = append([]string{}, parseSubprotocols...)
+func WithSubprotocols(subprotocols ...string) ClientOption {
+	return func(o *clientOptions) {
+		o.setTunnelSubprotocols = append([]string{}, subprotocols...)
 	}
 }
 
 // WithProxy configures a proxy selector for websocket dialing.
-func WithProxy(parseProxy func(*http.Request) (*url.URL, error)) ClientOption {
-	return func(parseO *clientOptions) {
-		parseO.setTunnelProxy = parseProxy
+func WithProxy(proxy func(*http.Request) (*url.URL, error)) ClientOption {
+	return func(o *clientOptions) {
+		o.setTunnelProxy = proxy
 	}
 }
 
 // WithHandshakeTimeout configures the websocket handshake timeout.
-func WithHandshakeTimeout(parseTimeout time.Duration) ClientOption {
-	return func(parseO *clientOptions) {
-		parseO.setTunnelTimeout = parseTimeout
+func WithHandshakeTimeout(timeout time.Duration) ClientOption {
+	return func(o *clientOptions) {
+		o.setTunnelTimeout = timeout
 	}
 }
 
 // WithDialCompression enables websocket per-message compression for client dialing.
 func WithDialCompression() ClientOption {
-	return func(parseO *clientOptions) {
-		parseO.shouldEnableCompression = true
+	return func(o *clientOptions) {
+		o.shouldEnableCompression = true
 	}
 }
 
 // WithReconnectPolicy configures optional gRPC reconnect backoff behavior.
-func WithReconnectPolicy(parseConfig ReconnectConfig) ClientOption {
-	return func(parseO *clientOptions) {
-		parseReconnectConfig := parseConfig
-		parseO.setTunnelReconnect = &parseReconnectConfig
+func WithReconnectPolicy(cfg ReconnectConfig) ClientOption {
+	return func(o *clientOptions) {
+		reconnectConfig := cfg
+		o.setTunnelReconnect = &reconnectConfig
 	}
 }
 
 // splitDialOptions separates grpctunnel client options from grpc dial options.
-func splitDialOptions(parseOpts []interface{}) ([]ClientOption, []grpc.DialOption, error) {
-	var parseTunnelOpts []ClientOption
-	var parseGrpcOpts []grpc.DialOption
+func splitDialOptions(opts []interface{}) ([]ClientOption, []grpc.DialOption, error) {
+	var tunnelOpts []ClientOption
+	var grpcOpts []grpc.DialOption
 
-	for _, parseOpt := range parseOpts {
+	for _, opt := range opts {
 		// Keep tunnel-specific options separate so they affect websocket dialing,
 		// while grpc options continue through to grpc.DialContext untouched.
-		switch parseTypedOption := parseOpt.(type) {
+		switch typedOption := opt.(type) {
 		case ClientOption:
-			parseTunnelOpts = append(parseTunnelOpts, parseTypedOption)
+			tunnelOpts = append(tunnelOpts, typedOption)
 		case grpc.DialOption:
-			parseGrpcOpts = append(parseGrpcOpts, parseTypedOption)
+			grpcOpts = append(grpcOpts, typedOption)
 		default:
-			return nil, nil, fmt.Errorf("grpctunnel: unsupported dial option type %T", parseOpt)
+			return nil, nil, fmt.Errorf("grpctunnel: unsupported dial option type %T", opt)
 		}
 	}
 
-	return parseTunnelOpts, parseGrpcOpts, nil
+	return tunnelOpts, grpcOpts, nil
+}
+
+// mapHTTPSchemeToWebSocket rewrites http:// and https:// target prefixes to
+// their websocket equivalents so callers can pass plain service URLs.
+func mapHTTPSchemeToWebSocket(target string) string {
+	if rest, ok := strings.CutPrefix(target, "https://"); ok {
+		return "wss://" + rest
+	}
+	if rest, ok := strings.CutPrefix(target, "http://"); ok {
+		return "ws://" + rest
+	}
+	return target
 }
 
 // ParseTunnelTargetURL normalizes a tunnel target into a websocket URL.
-func ParseTunnelTargetURL(parseTarget string, shouldTunnelUseTLS bool) (string, error) {
-	parseTarget = strings.TrimSpace(parseTarget)
-	if parseTarget == "" {
+// Accepted forms: host:port, :port, ws:// or wss:// URLs, and http:// or
+// https:// URLs (mapped to ws:// and wss:// respectively).
+func ParseTunnelTargetURL(target string, shouldTunnelUseTLS bool) (string, error) {
+	target = strings.TrimSpace(target)
+	if target == "" {
 		return "", fmt.Errorf("grpctunnel: target is required")
 	}
 
-	if strings.Contains(parseTarget, "://") &&
-		!strings.HasPrefix(parseTarget, "ws://") &&
-		!strings.HasPrefix(parseTarget, "wss://") {
-		parseTargetURL, parseErr := url.Parse(parseTarget)
-		if parseErr != nil {
-			return "", fmt.Errorf("grpctunnel: invalid target %q: %w", parseTarget, parseErr)
+	target = mapHTTPSchemeToWebSocket(target)
+
+	if strings.Contains(target, "://") &&
+		!strings.HasPrefix(target, "ws://") &&
+		!strings.HasPrefix(target, "wss://") {
+		targetURL, err := url.Parse(target)
+		if err != nil {
+			return "", fmt.Errorf("grpctunnel: invalid target %q: %w", target, err)
 		}
-		return "", fmt.Errorf("grpctunnel: unsupported target scheme %q", parseTargetURL.Scheme)
+		return "", fmt.Errorf("grpctunnel: unsupported target scheme %q", targetURL.Scheme)
 	}
 
-	if strings.HasPrefix(parseTarget, ":") {
-		parseTarget = "localhost" + parseTarget
+	if strings.HasPrefix(target, ":") {
+		target = "localhost" + target
 	}
 
-	if !strings.HasPrefix(parseTarget, "ws://") && !strings.HasPrefix(parseTarget, "wss://") {
-		parseScheme := "ws"
+	if !strings.HasPrefix(target, "ws://") && !strings.HasPrefix(target, "wss://") {
+		scheme := "ws"
 		if shouldTunnelUseTLS {
-			parseScheme = "wss"
+			scheme = "wss"
 		}
-		parseTarget = parseScheme + "://" + parseTarget
+		target = scheme + "://" + target
 	}
 
-	parseTargetURL, parseErr := url.Parse(parseTarget)
-	if parseErr != nil {
-		return "", fmt.Errorf("grpctunnel: invalid target %q: %w", parseTarget, parseErr)
+	targetURL, err := url.Parse(target)
+	if err != nil {
+		return "", fmt.Errorf("grpctunnel: invalid target %q: %w", target, err)
 	}
-	if parseTargetURL.Scheme != "ws" && parseTargetURL.Scheme != "wss" {
-		return "", fmt.Errorf("grpctunnel: unsupported target scheme %q", parseTargetURL.Scheme)
+	if targetURL.Scheme != "ws" && targetURL.Scheme != "wss" {
+		return "", fmt.Errorf("grpctunnel: unsupported target scheme %q", targetURL.Scheme)
 	}
-	if parseTargetURL.Host == "" {
+	if targetURL.Host == "" {
 		return "", fmt.Errorf("grpctunnel: target host is required")
 	}
-	return parseTargetURL.String(), nil
+	return targetURL.String(), nil
 }
 
 // inferWebSocketURL converts a target address to a WebSocket URL.
 // It keeps compatibility with legacy tests and wrappers.
-func inferWebSocketURL(parseTarget string, isUseTLS bool) string {
-	parseResult, parseErr := ParseTunnelTargetURL(parseTarget, isUseTLS)
-	if parseErr != nil {
-		return parseTarget
+func inferWebSocketURL(target string, isUseTLS bool) string {
+	result, err := ParseTunnelTargetURL(target, isUseTLS)
+	if err != nil {
+		return target
 	}
-	return parseResult
+	return result
 }
 
 // buildTunnelDialer creates a custom gRPC dialer that establishes WebSocket connections.
-func buildTunnelDialer(parseConfig TunnelConfig) func(context.Context, string) (net.Conn, error) {
-	parseTargetURL, parseTargetErr := url.Parse(parseConfig.Target)
-	if parseTargetErr != nil {
+func buildTunnelDialer(cfg TunnelConfig) func(context.Context, string) (net.Conn, error) {
+	targetURL, targetErr := url.Parse(cfg.Target)
+	if targetErr != nil {
 		return func(context.Context, string) (net.Conn, error) {
-			return nil, parseTargetErr
+			return nil, targetErr
 		}
 	}
 
 	// Reuse parsed target and dialer configuration for each reconnect attempt.
-	parseDialURL := parseTargetURL.String()
-	parseHeadersTemplate := http.Header(nil)
-	if parseConfig.Headers != nil {
-		parseHeadersTemplate = parseConfig.Headers.Clone()
+	dialURL := targetURL.String()
+	headersTemplate := http.Header(nil)
+	if cfg.Headers != nil {
+		headersTemplate = cfg.Headers.Clone()
 	}
-	parseDialer := websocket.Dialer{
-		TLSClientConfig:   parseConfig.TLSConfig,
-		Subprotocols:      append([]string{}, parseConfig.Subprotocols...),
-		Proxy:             parseConfig.Proxy,
-		HandshakeTimeout:  parseConfig.HandshakeTimeout,
-		WriteBufferPool:   buildWebSocketWriteBufferPool(parseDefaultWebSocketBufferSize),
-		EnableCompression: parseConfig.ShouldEnableCompression,
+	dialer := websocket.Dialer{
+		TLSClientConfig:   cfg.TLSConfig,
+		Subprotocols:      append([]string{}, cfg.Subprotocols...),
+		Proxy:             cfg.Proxy,
+		HandshakeTimeout:  cfg.HandshakeTimeout,
+		WriteBufferPool:   buildWebSocketWriteBufferPool(defaultWebSocketBufferSize),
+		EnableCompression: cfg.ShouldEnableCompression,
 	}
 
-	return func(parseCtx context.Context, parseAddr string) (net.Conn, error) {
-		parseWebsocket, _, parseErr := parseDialer.DialContext(parseCtx, parseDialURL, parseHeadersTemplate)
-		if parseErr != nil {
-			return nil, parseErr
+	return func(ctx context.Context, addr string) (net.Conn, error) {
+		ws, _, err := dialer.DialContext(ctx, dialURL, headersTemplate)
+		if err != nil {
+			return nil, err
 		}
-		return newWebSocketConn(parseWebsocket), nil
+		return newWebSocketConn(ws), nil
 	}
 }
 
 // getTunnelConfigErrorWithoutTarget validates non-target TunnelConfig fields for non-WASM builds.
-func getTunnelConfigErrorWithoutTarget(parseConfig TunnelConfig) error {
-	if parseConfig.HandshakeTimeout < 0 {
+func getTunnelConfigErrorWithoutTarget(cfg TunnelConfig) error {
+	if cfg.HandshakeTimeout < 0 {
 		return fmt.Errorf("grpctunnel: HandshakeTimeout must be >= 0")
 	}
-	if parseConfig.ReconnectConfig != nil {
-		if parseErr := GetReconnectConfigError(*parseConfig.ReconnectConfig); parseErr != nil {
-			return parseErr
+	if cfg.ReconnectConfig != nil {
+		if err := GetReconnectConfigError(*cfg.ReconnectConfig); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 // buildTunnelTargetURL normalizes websocket target URL from TunnelConfig.
-func buildTunnelTargetURL(parseConfig TunnelConfig) (string, error) {
-	shouldTunnelUseTLS := parseConfig.ShouldUseTLS || parseConfig.TLSConfig != nil
-	return ParseTunnelTargetURL(parseConfig.Target, shouldTunnelUseTLS)
+func buildTunnelTargetURL(cfg TunnelConfig) (string, error) {
+	shouldTunnelUseTLS := cfg.ShouldUseTLS || cfg.TLSConfig != nil
+	return ParseTunnelTargetURL(cfg.Target, shouldTunnelUseTLS)
 }
 
 // GetTunnelConfigError validates TunnelConfig for non-WASM builds.
-func GetTunnelConfigError(parseConfig TunnelConfig) error {
-	if parseErr := getTunnelConfigErrorWithoutTarget(parseConfig); parseErr != nil {
-		return parseErr
+func GetTunnelConfigError(cfg TunnelConfig) error {
+	if err := getTunnelConfigErrorWithoutTarget(cfg); err != nil {
+		return err
 	}
 
-	_, parseErr := buildTunnelTargetURL(parseConfig)
-	return parseErr
+	_, err := buildTunnelTargetURL(cfg)
+	return err
 }
 
 // BuildTunnelConn creates a typed gRPC client connection over websocket transport.
-func BuildTunnelConn(parseCtx context.Context, parseConfig TunnelConfig) (*grpc.ClientConn, error) {
-	if parseErr := getTunnelConfigErrorWithoutTarget(parseConfig); parseErr != nil {
-		return nil, parseErr
+func BuildTunnelConn(ctx context.Context, cfg TunnelConfig) (*grpc.ClientConn, error) {
+	if err := getTunnelConfigErrorWithoutTarget(cfg); err != nil {
+		return nil, err
 	}
 
-	parseTunnelURL, parseErr := buildTunnelTargetURL(parseConfig)
-	if parseErr != nil {
-		return nil, parseErr
+	tunnelURL, err := buildTunnelTargetURL(cfg)
+	if err != nil {
+		return nil, err
 	}
 
-	parseDialOptions := make([]grpc.DialOption, 0, len(parseConfig.GRPCOptions)+2)
-	if parseConfig.ReconnectConfig != nil {
-		parseReconnectOptions, parseErr := ApplyTunnelReconnectPolicy(nil, *parseConfig.ReconnectConfig)
-		if parseErr != nil {
-			return nil, parseErr
+	dialOptions := make([]grpc.DialOption, 0, len(cfg.GRPCOptions)+2)
+	if cfg.ReconnectConfig != nil {
+		reconnectOptions, err := ApplyTunnelReconnectPolicy(nil, *cfg.ReconnectConfig)
+		if err != nil {
+			return nil, err
 		}
-		parseDialOptions = append(parseDialOptions, parseReconnectOptions...)
+		dialOptions = append(dialOptions, reconnectOptions...)
 	}
-	parseDialOptions = append(parseDialOptions, parseConfig.GRPCOptions...)
-	parseDialOptions = append(parseDialOptions, grpc.WithContextDialer(buildTunnelDialer(TunnelConfig{
-		Target:                  parseTunnelURL,
-		TLSConfig:               parseConfig.TLSConfig,
-		Headers:                 parseConfig.Headers,
-		Subprotocols:            parseConfig.Subprotocols,
-		Proxy:                   parseConfig.Proxy,
-		HandshakeTimeout:        parseConfig.HandshakeTimeout,
-		ShouldEnableCompression: parseConfig.ShouldEnableCompression,
+	dialOptions = append(dialOptions, cfg.GRPCOptions...)
+	dialOptions = append(dialOptions, grpc.WithContextDialer(buildTunnelDialer(TunnelConfig{
+		Target:                  tunnelURL,
+		TLSConfig:               cfg.TLSConfig,
+		Headers:                 cfg.Headers,
+		Subprotocols:            cfg.Subprotocols,
+		Proxy:                   cfg.Proxy,
+		HandshakeTimeout:        cfg.HandshakeTimeout,
+		ShouldEnableCompression: cfg.ShouldEnableCompression,
 	})))
 
-	return grpc.DialContext(parseCtx, buildTunnelGRPCDialTarget(parseConfig.Target, parseTunnelURL), parseDialOptions...)
+	return grpc.DialContext(ctx, buildTunnelGRPCDialTarget(cfg.Target, tunnelURL), dialOptions...)
 }
 
 // Dial creates a gRPC client connection over WebSocket.
 // The target can be:
 //   - A WebSocket URL: "ws://localhost:8080" or "wss://api.example.com"
+//   - An HTTP URL: "https://api.example.com" (mapped to wss://)
 //   - A host:port: "localhost:8080" (infers ws://)
 //   - A port: ":8080" (infers ws://localhost:8080)
 //
@@ -283,7 +300,6 @@ func BuildTunnelConn(parseCtx context.Context, parseConfig TunnelConfig) (*grpc.
 // Example:
 //
 //	conn, err := grpctunnel.Dial("localhost:8080",
-//	    grpctunnel.WithTLS(&tls.Config{InsecureSkipVerify: true}),
 //	    grpc.WithTransportCredentials(insecure.NewCredentials()),
 //	)
 //	if err != nil {
@@ -292,14 +308,14 @@ func BuildTunnelConn(parseCtx context.Context, parseConfig TunnelConfig) (*grpc.
 //	defer conn.Close()
 //
 //	client := proto.NewYourServiceClient(conn)
-func Dial(parseTarget string, parseOpts ...interface{}) (*grpc.ClientConn, error) {
-	return DialContext(context.Background(), parseTarget, parseOpts...)
+func Dial(target string, opts ...interface{}) (*grpc.ClientConn, error) {
+	return DialContext(context.Background(), target, opts...)
 }
 
 // DialContext creates a gRPC client connection over WebSocket with context.
 // This is the context-aware version of Dial.
 //
-// The parseOpts list accepts a mix of:
+// The opts list accepts a mix of:
 //   - ClientOption values from this package (for tunnel behavior)
 //   - grpc.DialOption values from google.golang.org/grpc
 //
@@ -311,27 +327,27 @@ func Dial(parseTarget string, parseOpts ...interface{}) (*grpc.ClientConn, error
 //	conn, err := grpctunnel.DialContext(ctx, "localhost:8080",
 //	    grpc.WithTransportCredentials(insecure.NewCredentials()),
 //	)
-func DialContext(parseCtx context.Context, parseTarget string, parseOpts ...interface{}) (*grpc.ClientConn, error) {
-	parseTunnelOpts, parseGrpcOpts, parseErr := splitDialOptions(parseOpts)
-	if parseErr != nil {
-		return nil, parseErr
+func DialContext(ctx context.Context, target string, opts ...interface{}) (*grpc.ClientConn, error) {
+	tunnelOpts, grpcOpts, err := splitDialOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
-	parseTunnelOptions := &clientOptions{}
-	for _, parseTunnelOption := range parseTunnelOpts {
-		parseTunnelOption(parseTunnelOptions)
+	tunnelOptions := &clientOptions{}
+	for _, tunnelOption := range tunnelOpts {
+		tunnelOption(tunnelOptions)
 	}
 
-	return BuildTunnelConn(parseCtx, TunnelConfig{
-		Target:                  parseTarget,
-		TLSConfig:               parseTunnelOptions.tlsConfig,
-		ShouldUseTLS:            parseTunnelOptions.isUseTLS,
-		Headers:                 parseTunnelOptions.setTunnelHeaders,
-		Subprotocols:            parseTunnelOptions.setTunnelSubprotocols,
-		Proxy:                   parseTunnelOptions.setTunnelProxy,
-		HandshakeTimeout:        parseTunnelOptions.setTunnelTimeout,
-		ShouldEnableCompression: parseTunnelOptions.shouldEnableCompression,
-		ReconnectConfig:         parseTunnelOptions.setTunnelReconnect,
-		GRPCOptions:             parseGrpcOpts,
+	return BuildTunnelConn(ctx, TunnelConfig{
+		Target:                  target,
+		TLSConfig:               tunnelOptions.tlsConfig,
+		ShouldUseTLS:            tunnelOptions.isUseTLS,
+		Headers:                 tunnelOptions.setTunnelHeaders,
+		Subprotocols:            tunnelOptions.setTunnelSubprotocols,
+		Proxy:                   tunnelOptions.setTunnelProxy,
+		HandshakeTimeout:        tunnelOptions.setTunnelTimeout,
+		ShouldEnableCompression: tunnelOptions.shouldEnableCompression,
+		ReconnectConfig:         tunnelOptions.setTunnelReconnect,
+		GRPCOptions:             grpcOpts,
 	})
 }

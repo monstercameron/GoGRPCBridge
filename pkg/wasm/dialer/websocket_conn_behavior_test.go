@@ -91,13 +91,24 @@ func storeDialerTestEnvironmentState(parseT *testing.T, isBrowserOnline bool, pa
 	parseDocument := js.Global().Get(jsGlobalObject).New()
 	parseDocument.Set(jsPropertyVisibilityState, parseVisibilityState)
 
-	js.Global().Set(jsGlobalNavigator, parseNavigator)
-	js.Global().Set(jsGlobalDocument, parseDocument)
+	// Node.js defines globalThis.navigator as an accessor property, so a plain
+	// assignment is silently ignored; defineProperty replaces it reliably.
+	setDialerTestGlobal(jsGlobalNavigator, parseNavigator)
+	setDialerTestGlobal(jsGlobalDocument, parseDocument)
 
 	return func() {
-		js.Global().Set(jsGlobalNavigator, parsePreviousNavigator)
-		js.Global().Set(jsGlobalDocument, parsePreviousDocument)
+		setDialerTestGlobal(jsGlobalNavigator, parsePreviousNavigator)
+		setDialerTestGlobal(jsGlobalDocument, parsePreviousDocument)
 	}
+}
+
+// setDialerTestGlobal overrides one globalThis property even when it is accessor-defined.
+func setDialerTestGlobal(parseName string, parseValue js.Value) {
+	parseDescriptor := js.Global().Get(jsGlobalObject).New()
+	parseDescriptor.Set("value", parseValue)
+	parseDescriptor.Set("configurable", true)
+	parseDescriptor.Set("writable", true)
+	js.Global().Get(jsGlobalObject).Call("defineProperty", js.Global(), parseName, parseDescriptor)
 }
 
 // TestBuildDialerEnvironmentState_OnlineVisible verifies diagnostics include online and visible states.

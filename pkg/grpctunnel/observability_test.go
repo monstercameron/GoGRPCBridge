@@ -46,20 +46,20 @@ func TestBuildBridgeHandler_RecordsUpgradeFailureMetrics(parseT *testing.T) {
 		parseT.Fatalf("Collect() error: %v", parseCollectErr)
 	}
 
-	parseFailureCount, hasFailureCount := getBridgeInt64SumMetricValue(parseResourceMetrics, parseBridgeUpgradeFailuresTotalMetric)
+	parseFailureCount, hasFailureCount := getBridgeInt64SumMetricValue(parseResourceMetrics, bridgeUpgradeFailuresTotalMetric)
 	if !hasFailureCount {
-		parseT.Fatalf("missing metric %q", parseBridgeUpgradeFailuresTotalMetric)
+		parseT.Fatalf("missing metric %q", bridgeUpgradeFailuresTotalMetric)
 	}
 	if parseFailureCount < 1 {
-		parseT.Fatalf("%s = %d, want >= 1", parseBridgeUpgradeFailuresTotalMetric, parseFailureCount)
+		parseT.Fatalf("%s = %d, want >= 1", bridgeUpgradeFailuresTotalMetric, parseFailureCount)
 	}
 
-	parseLatencyCount, hasLatencyCount := getBridgeFloat64HistogramCount(parseResourceMetrics, parseBridgeUpgradeLatencyMetric)
+	parseLatencyCount, hasLatencyCount := getBridgeFloat64HistogramCount(parseResourceMetrics, bridgeUpgradeLatencyMetric)
 	if !hasLatencyCount {
-		parseT.Fatalf("missing metric %q", parseBridgeUpgradeLatencyMetric)
+		parseT.Fatalf("missing metric %q", bridgeUpgradeLatencyMetric)
 	}
 	if parseLatencyCount < 1 {
-		parseT.Fatalf("%s count = %d, want >= 1", parseBridgeUpgradeLatencyMetric, parseLatencyCount)
+		parseT.Fatalf("%s count = %d, want >= 1", bridgeUpgradeLatencyMetric, parseLatencyCount)
 	}
 }
 

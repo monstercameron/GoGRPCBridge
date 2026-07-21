@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-03-27T04:32:09Z",
+  "generated_at_utc": "2026-07-21T18:20:08Z",
   "packages": {
     "pkg/bridge": [
       "func DialOption",
@@ -27,6 +27,7 @@
       "func ApplyTunnelInsecureCredentials",
       "func ApplyTunnelReconnectPolicy",
       "func BuildBridgeHandler",
+      "func BuildOriginAllowlistCheck",
       "func BuildToolingHandler",
       "func BuildTunnelConn",
       "func Dial",
@@ -37,9 +38,13 @@
       "func GetTunnelConfigError",
       "func HandleBridgeMux",
       "func ListenAndServe",
+      "func ListenAndServeTLS",
       "func ListenAndServeTooling",
+      "func NewServer",
       "func ParseTunnelTargetURL",
       "func Serve",
+      "func WithAllowedOrigins",
+      "func WithAuthorize",
       "func WithBridgeWebSocketCompression",
       "func WithBufferSizes",
       "func WithConnectHook",

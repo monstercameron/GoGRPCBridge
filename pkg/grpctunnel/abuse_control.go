@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const parseBridgeAbuseWindowDuration = time.Minute
+const bridgeAbuseWindowDuration = time.Minute
 
 // storeBridgeAbuseRateWindow tracks one client's fixed-window upgrade attempt counts.
 type storeBridgeAbuseRateWindow struct {
@@ -27,100 +27,117 @@ type bridgeAbuseGuard struct {
 	getActiveConnections       int
 	storeClientConnections     map[string]int
 	storeClientUpgradeAttempts map[string]storeBridgeAbuseRateWindow
+	lastWindowSweepAt          time.Time
 }
 
 // buildBridgeAbuseGuard creates an abuse guard for bridge runtime controls.
-func buildBridgeAbuseGuard(parseConfig BridgeConfig) *bridgeAbuseGuard {
+func buildBridgeAbuseGuard(cfg BridgeConfig) *bridgeAbuseGuard {
 	return &bridgeAbuseGuard{
-		setConfig:                  parseConfig,
+		setConfig:                  cfg,
 		storeClientConnections:     map[string]int{},
 		storeClientUpgradeAttempts: map[string]storeBridgeAbuseRateWindow{},
 	}
 }
 
 // reserveBridgeConnection validates abuse controls and reserves one connection slot.
-func (parseGuard *bridgeAbuseGuard) reserveBridgeConnection(parseRequest *http.Request, parseNow time.Time) error {
-	if parseGuard == nil {
+func (g *bridgeAbuseGuard) reserveBridgeConnection(r *http.Request, now time.Time) error {
+	if g == nil {
 		return nil
 	}
 
-	parseClientKey := buildBridgeClientKey(parseRequest)
-	if parseClientKey == "" {
-		parseClientKey = "unknown"
+	clientKey := buildBridgeClientKey(r)
+	if clientKey == "" {
+		clientKey = "unknown"
 	}
 
-	parseGuard.setGuardLock.Lock()
-	defer parseGuard.setGuardLock.Unlock()
+	g.setGuardLock.Lock()
+	defer g.setGuardLock.Unlock()
 
-	if parseGuard.setConfig.MaxUpgradesPerClientPerMinute > 0 {
-		parseWindow := parseGuard.storeClientUpgradeAttempts[parseClientKey]
-		if parseWindow.getWindowStartedAt.IsZero() || parseNow.Sub(parseWindow.getWindowStartedAt) >= parseBridgeAbuseWindowDuration {
-			parseWindow = storeBridgeAbuseRateWindow{
-				getWindowStartedAt: parseNow,
+	if g.setConfig.MaxUpgradesPerClientPerMinute > 0 {
+		g.sweepExpiredUpgradeWindows(now)
+		window := g.storeClientUpgradeAttempts[clientKey]
+		if window.getWindowStartedAt.IsZero() || now.Sub(window.getWindowStartedAt) >= bridgeAbuseWindowDuration {
+			window = storeBridgeAbuseRateWindow{
+				getWindowStartedAt: now,
 				getWindowCount:     0,
 			}
 		}
-		if parseWindow.getWindowCount >= parseGuard.setConfig.MaxUpgradesPerClientPerMinute {
-			return fmt.Errorf("upgrade rate exceeded for client %q", parseClientKey)
+		if window.getWindowCount >= g.setConfig.MaxUpgradesPerClientPerMinute {
+			return fmt.Errorf("upgrade rate exceeded for client %q", clientKey)
 		}
-		parseWindow.getWindowCount++
-		parseGuard.storeClientUpgradeAttempts[parseClientKey] = parseWindow
+		window.getWindowCount++
+		g.storeClientUpgradeAttempts[clientKey] = window
 	}
 
-	if parseGuard.setConfig.MaxActiveConnections > 0 && parseGuard.getActiveConnections >= parseGuard.setConfig.MaxActiveConnections {
+	if g.setConfig.MaxActiveConnections > 0 && g.getActiveConnections >= g.setConfig.MaxActiveConnections {
 		return fmt.Errorf("active connection cap exceeded")
 	}
 
-	parseClientConnections := parseGuard.storeClientConnections[parseClientKey]
-	if parseGuard.setConfig.MaxConnectionsPerClient > 0 && parseClientConnections >= parseGuard.setConfig.MaxConnectionsPerClient {
-		return fmt.Errorf("per-client connection cap exceeded for client %q", parseClientKey)
+	clientConnections := g.storeClientConnections[clientKey]
+	if g.setConfig.MaxConnectionsPerClient > 0 && clientConnections >= g.setConfig.MaxConnectionsPerClient {
+		return fmt.Errorf("per-client connection cap exceeded for client %q", clientKey)
 	}
 
-	parseGuard.getActiveConnections++
-	parseGuard.storeClientConnections[parseClientKey] = parseClientConnections + 1
+	g.getActiveConnections++
+	g.storeClientConnections[clientKey] = clientConnections + 1
 	return nil
 }
 
+// sweepExpiredUpgradeWindows drops expired rate windows so the per-client map
+// cannot grow without bound as distinct client addresses churn.
+// Callers must hold setGuardLock.
+func (g *bridgeAbuseGuard) sweepExpiredUpgradeWindows(now time.Time) {
+	if now.Sub(g.lastWindowSweepAt) < bridgeAbuseWindowDuration {
+		return
+	}
+	g.lastWindowSweepAt = now
+	for clientKey, window := range g.storeClientUpgradeAttempts {
+		if now.Sub(window.getWindowStartedAt) >= bridgeAbuseWindowDuration {
+			delete(g.storeClientUpgradeAttempts, clientKey)
+		}
+	}
+}
+
 // clearBridgeConnection releases one reserved connection slot for abuse controls.
-func (parseGuard *bridgeAbuseGuard) clearBridgeConnection(parseRequest *http.Request) {
-	if parseGuard == nil {
+func (g *bridgeAbuseGuard) clearBridgeConnection(r *http.Request) {
+	if g == nil {
 		return
 	}
 
-	parseClientKey := buildBridgeClientKey(parseRequest)
-	if parseClientKey == "" {
-		parseClientKey = "unknown"
+	clientKey := buildBridgeClientKey(r)
+	if clientKey == "" {
+		clientKey = "unknown"
 	}
 
-	parseGuard.setGuardLock.Lock()
-	defer parseGuard.setGuardLock.Unlock()
+	g.setGuardLock.Lock()
+	defer g.setGuardLock.Unlock()
 
-	if parseGuard.getActiveConnections > 0 {
-		parseGuard.getActiveConnections--
+	if g.getActiveConnections > 0 {
+		g.getActiveConnections--
 	}
 
-	parseClientConnections := parseGuard.storeClientConnections[parseClientKey]
-	if parseClientConnections <= 1 {
-		delete(parseGuard.storeClientConnections, parseClientKey)
+	clientConnections := g.storeClientConnections[clientKey]
+	if clientConnections <= 1 {
+		delete(g.storeClientConnections, clientKey)
 		return
 	}
-	parseGuard.storeClientConnections[parseClientKey] = parseClientConnections - 1
+	g.storeClientConnections[clientKey] = clientConnections - 1
 }
 
 // buildBridgeClientKey derives a stable client key for abuse controls from request remote address.
-func buildBridgeClientKey(parseRequest *http.Request) string {
-	if parseRequest == nil {
+func buildBridgeClientKey(r *http.Request) string {
+	if r == nil {
 		return ""
 	}
 
-	parseRemoteAddress := strings.TrimSpace(parseRequest.RemoteAddr)
-	if parseRemoteAddress == "" {
+	remoteAddress := strings.TrimSpace(r.RemoteAddr)
+	if remoteAddress == "" {
 		return ""
 	}
 
-	parseHost, _, parseErr := net.SplitHostPort(parseRemoteAddress)
-	if parseErr == nil {
-		return strings.TrimSpace(parseHost)
+	host, _, err := net.SplitHostPort(remoteAddress)
+	if err == nil {
+		return strings.TrimSpace(host)
 	}
-	return parseRemoteAddress
+	return remoteAddress
 }

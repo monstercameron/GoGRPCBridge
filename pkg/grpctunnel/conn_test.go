@@ -171,8 +171,11 @@ func TestWebSocketConn_ReadRejectsTextFrame(parseT *testing.T) {
 	if parseReadCount != 0 {
 		parseT.Fatalf("Read count = %d, want 0", parseReadCount)
 	}
-	if !errors.Is(parseReadErr, io.EOF) {
-		parseT.Fatalf("Read error = %v, want %v", parseReadErr, io.EOF)
+	if parseReadErr == nil || errors.Is(parseReadErr, io.EOF) {
+		parseT.Fatalf("Read error = %v, want explicit non-EOF protocol error", parseReadErr)
+	}
+	if !strings.Contains(parseReadErr.Error(), "unexpected websocket message type") {
+		parseT.Fatalf("Read error = %v, want message-type protocol error", parseReadErr)
 	}
 }
 

@@ -3,6 +3,7 @@
 package grpctunnel
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -24,123 +25,125 @@ type webSocketConn struct {
 	deadlineMu sync.Mutex // Protects deadline operations
 }
 
-func newWebSocketConn(parseWs *websocket.Conn) net.Conn {
-	return &webSocketConn{ws: parseWs}
+func newWebSocketConn(ws *websocket.Conn) net.Conn {
+	return &webSocketConn{ws: ws}
 }
 
 // Read reads binary payload bytes from the underlying WebSocket stream.
-func (parseC *webSocketConn) Read(parseP []byte) (int, error) {
-	parseC.readMu.Lock()
-	defer parseC.readMu.Unlock()
+func (c *webSocketConn) Read(p []byte) (int, error) {
+	c.readMu.Lock()
+	defer c.readMu.Unlock()
 
-	if parseC.isClosed.Load() {
+	if c.isClosed.Load() {
 		return 0, io.EOF
 	}
-	if parseC.ws == nil {
+	if c.ws == nil {
 		return 0, io.EOF
 	}
 
 	for {
-		if parseC.reader == nil {
-			parseMessageType, parseReader, parseErr := parseC.ws.NextReader()
-			if parseErr != nil {
-				return 0, parseErr
+		if c.reader == nil {
+			messageType, reader, err := c.ws.NextReader()
+			if err != nil {
+				return 0, err
 			}
-			if parseMessageType != websocket.BinaryMessage {
-				return 0, io.EOF
+			if messageType != websocket.BinaryMessage {
+				// gRPC frames are always binary; a text frame is a protocol
+				// violation, not a clean end of stream.
+				return 0, fmt.Errorf("grpctunnel: unexpected websocket message type %d (want binary)", messageType)
 			}
-			parseC.reader = parseReader
+			c.reader = reader
 		}
 
-		parseN, parseErr2 := parseC.reader.Read(parseP)
-		if parseErr2 == io.EOF {
-			parseC.reader = nil
-			if parseN > 0 {
-				return parseN, nil
+		n, err := c.reader.Read(p)
+		if err == io.EOF {
+			c.reader = nil
+			if n > 0 {
+				return n, nil
 			}
 			// Empty frame: continue draining subsequent frames until payload arrives.
 			continue
 		}
-		return parseN, parseErr2
+		return n, err
 	}
 }
 
 // Write writes one binary WebSocket message from the provided byte slice.
-func (parseC *webSocketConn) Write(parseP []byte) (int, error) {
-	parseC.writeMu.Lock()
-	defer parseC.writeMu.Unlock()
+func (c *webSocketConn) Write(p []byte) (int, error) {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
 
-	if parseC.isClosed.Load() {
+	if c.isClosed.Load() {
 		return 0, io.ErrClosedPipe
 	}
-	if parseC.ws == nil {
+	if c.ws == nil {
 		return 0, io.ErrClosedPipe
 	}
 
-	if parseErr := parseC.ws.WriteMessage(websocket.BinaryMessage, parseP); parseErr != nil {
-		return 0, parseErr
+	if err := c.ws.WriteMessage(websocket.BinaryMessage, p); err != nil {
+		return 0, err
 	}
-	return len(parseP), nil
+	return len(p), nil
 }
 
 // Close closes the adapted connection and underlying WebSocket exactly once.
-func (parseC *webSocketConn) Close() error {
-	var parseErr error
-	parseC.closeOnce.Do(func() {
-		parseC.isClosed.Store(true)
-		if parseC.ws == nil {
+func (c *webSocketConn) Close() error {
+	var err error
+	c.closeOnce.Do(func() {
+		c.isClosed.Store(true)
+		if c.ws == nil {
 			return
 		}
-		parseErr = parseC.ws.Close()
+		err = c.ws.Close()
 	})
-	return parseErr
+	return err
 }
 
 // LocalAddr returns the local network address for this connection.
-func (parseC *webSocketConn) LocalAddr() net.Addr {
-	if parseC.ws == nil {
+func (c *webSocketConn) LocalAddr() net.Addr {
+	if c.ws == nil {
 		return nil
 	}
-	return parseC.ws.LocalAddr()
+	return c.ws.LocalAddr()
 }
 
 // RemoteAddr returns the remote network address for this connection.
-func (parseC *webSocketConn) RemoteAddr() net.Addr {
-	if parseC.ws == nil {
+func (c *webSocketConn) RemoteAddr() net.Addr {
+	if c.ws == nil {
 		return nil
 	}
-	return parseC.ws.RemoteAddr()
+	return c.ws.RemoteAddr()
 }
 
 // SetDeadline sets read and write deadlines on the underlying WebSocket.
-func (parseC *webSocketConn) SetDeadline(parseT time.Time) error {
-	parseC.deadlineMu.Lock()
-	defer parseC.deadlineMu.Unlock()
-	if parseC.ws == nil {
+func (c *webSocketConn) SetDeadline(t time.Time) error {
+	c.deadlineMu.Lock()
+	defer c.deadlineMu.Unlock()
+	if c.ws == nil {
 		return net.ErrClosed
 	}
-	if parseErr := parseC.ws.SetReadDeadline(parseT); parseErr != nil {
-		return parseErr
+	if err := c.ws.SetReadDeadline(t); err != nil {
+		return err
 	}
-	return parseC.ws.SetWriteDeadline(parseT)
+	return c.ws.SetWriteDeadline(t)
 }
 
 // SetReadDeadline sets the read deadline on the underlying WebSocket.
-func (parseC *webSocketConn) SetReadDeadline(parseT time.Time) error {
-	parseC.deadlineMu.Lock()
-	defer parseC.deadlineMu.Unlock()
-	if parseC.ws == nil {
+func (c *webSocketConn) SetReadDeadline(t time.Time) error {
+	c.deadlineMu.Lock()
+	defer c.deadlineMu.Unlock()
+	if c.ws == nil {
 		return net.ErrClosed
 	}
-	return parseC.ws.SetReadDeadline(parseT)
+	return c.ws.SetReadDeadline(t)
 }
 
 // SetWriteDeadline sets the write deadline on the underlying WebSocket.
-func (parseC *webSocketConn) SetWriteDeadline(parseT time.Time) error {
-	parseC.deadlineMu.Lock()
-	defer parseC.deadlineMu.Unlock()
-	if parseC.ws == nil {
+func (c *webSocketConn) SetWriteDeadline(t time.Time) error {
+	c.deadlineMu.Lock()
+	defer c.deadlineMu.Unlock()
+	if c.ws == nil {
 		return net.ErrClosed
 	}
-	return parseC.ws.SetWriteDeadline(parseT)
+	return c.ws.SetWriteDeadline(t)
 }

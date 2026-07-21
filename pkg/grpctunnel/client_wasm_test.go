@@ -36,6 +36,8 @@ func TestInferBrowserWebSocketURL_FullURL(parseT *testing.T) {
 	}{
 		{"WebSocket URL", "ws://localhost:8080", "ws://localhost:8080"},
 		{"Secure WebSocket", "wss://api.example.com", "wss://api.example.com"},
+		{"HTTP URL maps to ws", "http://localhost:8080", "ws://localhost:8080"},
+		{"HTTPS URL maps to wss", "https://api.example.com/grpc", "wss://api.example.com/grpc"},
 	}
 
 	for _, parseTt := range parseTests {
@@ -130,6 +132,14 @@ func TestDialContext_RejectsHandshakeTimeoutOption(parseT *testing.T) {
 	_, parseErr := DialContext(context.Background(), "", WithHandshakeTimeout(0))
 	if parseErr == nil || !strings.Contains(parseErr.Error(), "HandshakeTimeout is not supported in WASM") {
 		parseT.Fatalf("DialContext() error = %v, want handshake timeout rejection", parseErr)
+	}
+}
+
+// TestParseTunnelTargetURL_RejectsUnsupportedScheme verifies non-websocket schemes fail in WASM.
+func TestParseTunnelTargetURL_RejectsUnsupportedScheme(parseT *testing.T) {
+	_, parseErr := ParseTunnelTargetURL("ftp://localhost:8080", false)
+	if parseErr == nil || !strings.Contains(parseErr.Error(), "unsupported target scheme") {
+		parseT.Fatalf("ParseTunnelTargetURL() error = %v, want unsupported scheme error", parseErr)
 	}
 }
 

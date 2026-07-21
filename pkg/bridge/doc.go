@@ -5,6 +5,8 @@
 //   - net.Conn adaptation for gorilla/websocket via NewWebSocketConn
 //   - a client dial helper via DialOption
 //
-// For most applications, prefer the higher-level pkg/grpctunnel package.
-// Use this package when you need direct control over bridge handler wiring.
+// Deprecated: prefer the higher-level pkg/grpctunnel package for new work.
+// This package remains supported for existing integrations that need direct
+// control over bridge handler wiring, but new features (authorization hooks,
+// origin allowlisting, graceful shutdown helpers) land in pkg/grpctunnel only.
 package bridge

@@ -49,6 +49,7 @@ The module path remains `github.com/monstercameron/GoGRPCBridge` for consumer co
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -57,13 +58,11 @@ import (
 	"google.golang.org/grpc"
 )
 
-func isAllowedOrigin(r *http.Request) bool {
-	switch r.Header.Get("Origin") {
-	case "https://app.example.com":
-		return true
-	default:
-		return false
+func authorize(r *http.Request) error {
+	if r.Header.Get("X-Bridge-Token") == "" {
+		return errors.New("missing bridge token")
 	}
+	return nil
 }
 
 func main() {
@@ -72,7 +71,8 @@ func main() {
 
 	handler := grpctunnel.Wrap(
 		grpcServer,
-		grpctunnel.WithOriginCheck(isAllowedOrigin),
+		grpctunnel.WithAllowedOrigins("https://app.example.com", "https://*.example.com"),
+		grpctunnel.WithAuthorize(authorize),
 		grpctunnel.WithKeepalive(30*time.Second, 2*time.Minute),
 		grpctunnel.WithReadLimitBytes(4<<20),
 		grpctunnel.WithMaxActiveConnections(2000),
@@ -85,6 +85,20 @@ func main() {
 
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
+```
+
+For graceful shutdown or TLS termination, build the server yourself:
+
+```go
+srv := grpctunnel.NewServer(":8080", grpcServer,
+	grpctunnel.WithAllowedOrigins("https://app.example.com"),
+)
+go func() { log.Println(srv.ListenAndServe()) }()
+// ... on SIGTERM:
+_ = srv.Shutdown(ctx)
+
+// or one-liner TLS:
+// grpctunnel.ListenAndServeTLS(":443", "cert.pem", "key.pem", grpcServer)
 ```
 
 ### 2. Browser `js/wasm` gRPC client over tunnel
@@ -140,7 +154,8 @@ This is why the project exists: keep gRPC semantics while reducing transport ove
 
 ## Production Guardrails You Can Enforce
 
-- Origin allow-list with `WithOriginCheck`.
+- Origin allow-list with `WithAllowedOrigins` (exact and `*.` subdomain wildcards) or a custom `WithOriginCheck`.
+- Pre-upgrade authorization with `WithAuthorize` (rejects with 403 before any websocket or gRPC resources are allocated).
 - Frame/read bounds with `WithReadLimitBytes` (or explicit disable only when upstream bounds exist).
 - Abuse controls with:
   - `WithMaxActiveConnections`

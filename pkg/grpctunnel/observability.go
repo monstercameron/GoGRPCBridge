@@ -14,170 +14,170 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const parseBridgeObservabilityScope = "github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
-const parseBridgeRequestSpanName = "grpctunnel.bridge.request"
-const parseBridgeSessionSpanName = "grpctunnel.bridge.session"
+const bridgeObservabilityScope = "github.com/monstercameron/GoGRPCBridge/pkg/grpctunnel"
+const bridgeRequestSpanName = "grpctunnel.bridge.request"
+const bridgeSessionSpanName = "grpctunnel.bridge.session"
 
-const parseBridgeConnectionsActiveMetric = "bridge_connections_active"
-const parseBridgeConnectionsTotalMetric = "bridge_connections_total"
-const parseBridgeUpgradeFailuresTotalMetric = "bridge_upgrade_failures_total"
-const parseBridgeUpgradeLatencyMetric = "bridge_request_latency_ms"
+const bridgeConnectionsActiveMetric = "bridge_connections_active"
+const bridgeConnectionsTotalMetric = "bridge_connections_total"
+const bridgeUpgradeFailuresTotalMetric = "bridge_upgrade_failures_total"
+const bridgeUpgradeLatencyMetric = "bridge_request_latency_ms"
 
-const parseBridgeMetricResultSuccess = "success"
-const parseBridgeMetricResultFailure = "failure"
+const bridgeMetricResultSuccess = "success"
+const bridgeMetricResultFailure = "failure"
 
 // bridgeObservability stores OTel tracer and metrics handles for bridge runtime signals.
 type bridgeObservability struct {
-	getBridgeTracer               trace.Tracer
-	getBridgeConnectionsActive    metric.Int64UpDownCounter
-	getBridgeConnectionsTotal     metric.Int64Counter
-	getBridgeUpgradeFailuresTotal metric.Int64Counter
-	getBridgeUpgradeLatencyMS     metric.Float64Histogram
+	tracer               trace.Tracer
+	connectionsActive    metric.Int64UpDownCounter
+	connectionsTotal     metric.Int64Counter
+	upgradeFailuresTotal metric.Int64Counter
+	upgradeLatencyMS     metric.Float64Histogram
 }
 
 // buildBridgeObservability creates a bridge observability handle backed by the global OTel providers.
 func buildBridgeObservability() *bridgeObservability {
-	parseMeter := otel.Meter(parseBridgeObservabilityScope)
-	parseTracer := otel.Tracer(parseBridgeObservabilityScope)
+	meter := otel.Meter(bridgeObservabilityScope)
+	tracer := otel.Tracer(bridgeObservabilityScope)
 
-	parseConnectionsActive, _ := parseMeter.Int64UpDownCounter(
-		parseBridgeConnectionsActiveMetric,
+	connectionsActive, _ := meter.Int64UpDownCounter(
+		bridgeConnectionsActiveMetric,
 		metric.WithDescription("Current active websocket tunnel connections"),
 	)
-	parseConnectionsTotal, _ := parseMeter.Int64Counter(
-		parseBridgeConnectionsTotalMetric,
+	connectionsTotal, _ := meter.Int64Counter(
+		bridgeConnectionsTotalMetric,
 		metric.WithDescription("Total accepted websocket tunnel connections"),
 	)
-	parseUpgradeFailuresTotal, _ := parseMeter.Int64Counter(
-		parseBridgeUpgradeFailuresTotalMetric,
+	upgradeFailuresTotal, _ := meter.Int64Counter(
+		bridgeUpgradeFailuresTotalMetric,
 		metric.WithDescription("Total websocket upgrade failures"),
 	)
-	parseUpgradeLatencyMS, _ := parseMeter.Float64Histogram(
-		parseBridgeUpgradeLatencyMetric,
+	upgradeLatencyMS, _ := meter.Float64Histogram(
+		bridgeUpgradeLatencyMetric,
 		metric.WithUnit("ms"),
 		metric.WithDescription("Websocket upgrade request latency in milliseconds"),
 	)
 
 	return &bridgeObservability{
-		getBridgeTracer:               parseTracer,
-		getBridgeConnectionsActive:    parseConnectionsActive,
-		getBridgeConnectionsTotal:     parseConnectionsTotal,
-		getBridgeUpgradeFailuresTotal: parseUpgradeFailuresTotal,
-		getBridgeUpgradeLatencyMS:     parseUpgradeLatencyMS,
+		tracer:               tracer,
+		connectionsActive:    connectionsActive,
+		connectionsTotal:     connectionsTotal,
+		upgradeFailuresTotal: upgradeFailuresTotal,
+		upgradeLatencyMS:     upgradeLatencyMS,
 	}
 }
 
 // getBridgeMetricContext returns a non-nil context for OTel metric operations.
-func getBridgeMetricContext(parseContext context.Context) context.Context {
-	if parseContext == nil {
+func getBridgeMetricContext(ctx context.Context) context.Context {
+	if ctx == nil {
 		return context.Background()
 	}
-	return parseContext
+	return ctx
 }
 
 // buildBridgeMetricAttributes builds stable metric attributes from an HTTP request and result state.
-func buildBridgeMetricAttributes(parseRequest *http.Request, parseResult string) []attribute.KeyValue {
-	parseAttributes := []attribute.KeyValue{
+func buildBridgeMetricAttributes(r *http.Request, result string) []attribute.KeyValue {
+	attrs := []attribute.KeyValue{
 		attribute.String("component", "grpctunnel.bridge"),
 	}
-	if parseResult != "" {
-		parseAttributes = append(parseAttributes, attribute.String("result", parseResult))
+	if result != "" {
+		attrs = append(attrs, attribute.String("result", result))
 	}
-	if parseRequest == nil {
-		return parseAttributes
+	if r == nil {
+		return attrs
 	}
-	parseMethod := strings.TrimSpace(parseRequest.Method)
-	if parseMethod != "" {
-		parseAttributes = append(parseAttributes, attribute.String("method", parseMethod))
+	method := strings.TrimSpace(r.Method)
+	if method != "" {
+		attrs = append(attrs, attribute.String("method", method))
 	}
-	if parseRequest.URL != nil {
-		parsePath := strings.TrimSpace(parseRequest.URL.Path)
-		if parsePath != "" {
-			parseAttributes = append(parseAttributes, attribute.String("path", parsePath))
+	if r.URL != nil {
+		path := strings.TrimSpace(r.URL.Path)
+		if path != "" {
+			attrs = append(attrs, attribute.String("path", path))
 		}
 	}
-	return parseAttributes
+	return attrs
 }
 
 // storeBridgeUpgradeResult records websocket upgrade latency with result labels.
-func (parseObservability *bridgeObservability) storeBridgeUpgradeResult(parseContext context.Context, parseDuration time.Duration, parseRequest *http.Request, parseResult string) {
-	if parseObservability == nil || parseObservability.getBridgeUpgradeLatencyMS == nil {
+func (o *bridgeObservability) storeBridgeUpgradeResult(ctx context.Context, duration time.Duration, r *http.Request, result string) {
+	if o == nil || o.upgradeLatencyMS == nil {
 		return
 	}
-	parseAttributes := buildBridgeMetricAttributes(parseRequest, parseResult)
-	parseObservability.getBridgeUpgradeLatencyMS.Record(
-		getBridgeMetricContext(parseContext),
-		float64(parseDuration)/float64(time.Millisecond),
-		metric.WithAttributes(parseAttributes...),
+	attrs := buildBridgeMetricAttributes(r, result)
+	o.upgradeLatencyMS.Record(
+		getBridgeMetricContext(ctx),
+		float64(duration)/float64(time.Millisecond),
+		metric.WithAttributes(attrs...),
 	)
 }
 
 // storeBridgeUpgradeFailure records a websocket upgrade failure counter increment and latency sample.
-func (parseObservability *bridgeObservability) storeBridgeUpgradeFailure(parseContext context.Context, parseDuration time.Duration, parseRequest *http.Request) {
-	parseObservability.storeBridgeUpgradeResult(parseContext, parseDuration, parseRequest, parseBridgeMetricResultFailure)
-	if parseObservability == nil || parseObservability.getBridgeUpgradeFailuresTotal == nil {
+func (o *bridgeObservability) storeBridgeUpgradeFailure(ctx context.Context, duration time.Duration, r *http.Request) {
+	o.storeBridgeUpgradeResult(ctx, duration, r, bridgeMetricResultFailure)
+	if o == nil || o.upgradeFailuresTotal == nil {
 		return
 	}
-	parseAttributes := buildBridgeMetricAttributes(parseRequest, parseBridgeMetricResultFailure)
-	parseObservability.getBridgeUpgradeFailuresTotal.Add(
-		getBridgeMetricContext(parseContext),
+	attrs := buildBridgeMetricAttributes(r, bridgeMetricResultFailure)
+	o.upgradeFailuresTotal.Add(
+		getBridgeMetricContext(ctx),
 		1,
-		metric.WithAttributes(parseAttributes...),
+		metric.WithAttributes(attrs...),
 	)
 }
 
 // storeBridgeUpgradeSuccess records a websocket upgrade success latency sample.
-func (parseObservability *bridgeObservability) storeBridgeUpgradeSuccess(parseContext context.Context, parseDuration time.Duration, parseRequest *http.Request) {
-	parseObservability.storeBridgeUpgradeResult(parseContext, parseDuration, parseRequest, parseBridgeMetricResultSuccess)
+func (o *bridgeObservability) storeBridgeUpgradeSuccess(ctx context.Context, duration time.Duration, r *http.Request) {
+	o.storeBridgeUpgradeResult(ctx, duration, r, bridgeMetricResultSuccess)
 }
 
 // storeBridgeConnectionDelta updates active and total connection metrics from connect/disconnect events.
-func (parseObservability *bridgeObservability) storeBridgeConnectionDelta(parseContext context.Context, parseRequest *http.Request, parseDelta int64) {
-	if parseObservability == nil {
+func (o *bridgeObservability) storeBridgeConnectionDelta(ctx context.Context, r *http.Request, delta int64) {
+	if o == nil {
 		return
 	}
-	parseAttributes := buildBridgeMetricAttributes(parseRequest, "")
-	if parseObservability.getBridgeConnectionsActive != nil {
-		parseObservability.getBridgeConnectionsActive.Add(
-			getBridgeMetricContext(parseContext),
-			parseDelta,
-			metric.WithAttributes(parseAttributes...),
+	attrs := buildBridgeMetricAttributes(r, "")
+	if o.connectionsActive != nil {
+		o.connectionsActive.Add(
+			getBridgeMetricContext(ctx),
+			delta,
+			metric.WithAttributes(attrs...),
 		)
 	}
-	if parseDelta > 0 && parseObservability.getBridgeConnectionsTotal != nil {
-		parseObservability.getBridgeConnectionsTotal.Add(
-			getBridgeMetricContext(parseContext),
-			parseDelta,
-			metric.WithAttributes(parseAttributes...),
+	if delta > 0 && o.connectionsTotal != nil {
+		o.connectionsTotal.Add(
+			getBridgeMetricContext(ctx),
+			delta,
+			metric.WithAttributes(attrs...),
 		)
 	}
 }
 
 // startBridgeRequestSpan starts the server span used for one websocket upgrade request.
-func (parseObservability *bridgeObservability) startBridgeRequestSpan(parseContext context.Context, parseRequest *http.Request) (context.Context, trace.Span) {
-	parseContext = getBridgeMetricContext(parseContext)
-	if parseObservability == nil || parseObservability.getBridgeTracer == nil {
-		return parseContext, trace.SpanFromContext(parseContext)
+func (o *bridgeObservability) startBridgeRequestSpan(ctx context.Context, r *http.Request) (context.Context, trace.Span) {
+	ctx = getBridgeMetricContext(ctx)
+	if o == nil || o.tracer == nil {
+		return ctx, trace.SpanFromContext(ctx)
 	}
-	parseAttributes := buildBridgeMetricAttributes(parseRequest, "")
-	return parseObservability.getBridgeTracer.Start(
-		parseContext,
-		parseBridgeRequestSpanName,
+	attrs := buildBridgeMetricAttributes(r, "")
+	return o.tracer.Start(
+		ctx,
+		bridgeRequestSpanName,
 		trace.WithSpanKind(trace.SpanKindServer),
-		trace.WithAttributes(parseAttributes...),
+		trace.WithAttributes(attrs...),
 	)
 }
 
 // startBridgeSessionSpan starts the session span for a tunneled websocket lifecycle.
-func (parseObservability *bridgeObservability) startBridgeSessionSpan(parseContext context.Context, parseRequest *http.Request) (context.Context, trace.Span) {
-	parseContext = getBridgeMetricContext(parseContext)
-	if parseObservability == nil || parseObservability.getBridgeTracer == nil {
-		return parseContext, trace.SpanFromContext(parseContext)
+func (o *bridgeObservability) startBridgeSessionSpan(ctx context.Context, r *http.Request) (context.Context, trace.Span) {
+	ctx = getBridgeMetricContext(ctx)
+	if o == nil || o.tracer == nil {
+		return ctx, trace.SpanFromContext(ctx)
 	}
-	parseAttributes := buildBridgeMetricAttributes(parseRequest, "")
-	return parseObservability.getBridgeTracer.Start(
-		parseContext,
-		parseBridgeSessionSpanName,
-		trace.WithAttributes(parseAttributes...),
+	attrs := buildBridgeMetricAttributes(r, "")
+	return o.tracer.Start(
+		ctx,
+		bridgeSessionSpanName,
+		trace.WithAttributes(attrs...),
 	)
 }

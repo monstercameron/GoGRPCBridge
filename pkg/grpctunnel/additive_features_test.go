@@ -510,7 +510,7 @@ func TestGetBridgeReadLimitBytes(parseT *testing.T) {
 			parseConfig: BridgeConfig{
 				ReadLimitBytes: 0,
 			},
-			parseExpected: parseDefaultReadLimitBytes,
+			parseExpected: defaultReadLimitBytes,
 		},
 		{
 			parseName: "custom read limit",
@@ -578,8 +578,8 @@ func TestBuildBridgePingWriteTimeout(parseT *testing.T) {
 }
 
 func TestBuildWebSocketWriteBufferPool_CacheableBufferSize(parseT *testing.T) {
-	parsePoolOne := buildWebSocketWriteBufferPool(parseDefaultWebSocketBufferSize)
-	parsePoolTwo := buildWebSocketWriteBufferPool(parseDefaultWebSocketBufferSize)
+	parsePoolOne := buildWebSocketWriteBufferPool(defaultWebSocketBufferSize)
+	parsePoolTwo := buildWebSocketWriteBufferPool(defaultWebSocketBufferSize)
 	if parsePoolOne != parsePoolTwo {
 		parseT.Fatal("buildWebSocketWriteBufferPool() expected shared pool for cacheable size")
 	}

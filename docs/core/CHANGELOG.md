@@ -6,15 +6,34 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
-### Commits
+## [v0.1.0] - 2026-07-21
 
-- `be70bef` ci: harden security and release workflow guards
-- `430fe06` docs: add deep security fuzz release process
-- `d39af64` fix: harden websocket read and error-channel concurrency
-- `b37d222` feat: advance GoGRPCBridge dev-to-prod readiness
-- `7206dd4` chore: group current submodule updates
+### Highlights
+
+- Minor version bump: first release with new server-hardening surface area on `pkg/grpctunnel`.
+
+### Added
+
+- `BridgeConfig.Authorize` and `WithAuthorize` — pre-upgrade authorization hook; failing requests are rejected with `403 Forbidden` before any websocket or gRPC resources are allocated.
+- `WithAllowedOrigins` and `BuildOriginAllowlistCheck` — declarative origin allowlisting with case-insensitive exact matching, `"*"`, and `"scheme://*.domain"` subdomain wildcards; requests without an `Origin` header (non-browser clients) pass, matching browser-only origin-policy convention.
+- `NewServer` — returns a configured `*http.Server` so callers own graceful shutdown (`Shutdown`), TLS wiring, and timeout tuning. `Serve`/`ListenAndServe` now build on it.
+- `ListenAndServeTLS` — one-liner `wss://` server startup.
+- Client targets now accept `http://` and `https://` URLs on both native and WASM builds, mapped to `ws://` and `wss://` respectively.
+
+### Fixed
+
+- Server-side `net.Conn` adapter: a non-binary websocket frame now surfaces an explicit protocol error instead of being silently reported as clean `io.EOF` (which masked protocol violations as normal stream end).
+- WASM target inference: `http(s)://` targets previously produced malformed URLs like `ws://http://example.com`; unsupported schemes (e.g. `ftp://`) are now rejected with an error instead of being mangled.
+- Abuse controls: the per-client upgrade-rate window map is now swept once per window, fixing unbounded memory growth under client-address churn (slow memory-exhaustion vector).
+- WASM dialer test harness: environment overrides now use `Object.defineProperty`, fixing the `navigator.onLine` test under modern Node where `globalThis.navigator` is accessor-defined.
 
 ### Changed
+
+- `pkg/bridge` is formally deprecated in favor of `pkg/grpctunnel`; it remains supported for existing integrations but new features land in `pkg/grpctunnel` only.
+- Internal naming cleanup across `pkg/grpctunnel` and `pkg/wasm/dialer`: removed the machine-generated `parse*` prefix from locals, parameters, and unexported identifiers. No exported API was renamed or removed.
+- Documentation examples no longer demonstrate `InsecureSkipVerify`.
+
+### CI and repository (previously unreleased)
 
 - Hardened `test.yml` quality gates with one retry, `bin/quality/quality.log` artifact upload, and explicit CI race-skip fallback (`RUNNER_QUALITY_SKIP_RACE=1`) to unblock flaky race-toolchain lanes.
 - Hardened `release.yml` by capturing quality gate logs, using the same CI race-skip fallback in quality retries, forcing Node 24 action runtime, and adding post-publish release visibility/asset verification.

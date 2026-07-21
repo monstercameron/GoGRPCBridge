@@ -18,7 +18,8 @@ import (
 type TunnelConfig struct {
 	// Target is the connection target. In non-WASM builds this should be a
 	// host:port, :port, ws:// URL, or wss:// URL. In WASM builds it may also be
-	// empty or a path (for same-origin inference).
+	// empty or a path (for same-origin inference). http:// and https:// URLs
+	// are accepted and mapped to ws:// and wss:// respectively.
 	Target string
 	// TLSConfig configures the TLS settings for non-WASM websocket dialing.
 	TLSConfig *tls.Config
@@ -44,7 +45,13 @@ type TunnelConfig struct {
 type BridgeConfig struct {
 	// CheckOrigin validates websocket upgrade origins.
 	// If nil, gorilla/websocket applies its default same-origin policy.
+	// See BuildOriginAllowlistCheck for a ready-made allowlist policy.
 	CheckOrigin func(r *http.Request) bool
+	// Authorize validates a request before the websocket upgrade is attempted.
+	// A non-nil returned error rejects the request with 403 Forbidden before
+	// any websocket or gRPC resources are allocated. Use this for token or
+	// cookie checks on the upgrade request. Nil disables the hook.
+	Authorize func(r *http.Request) error
 	// ReadBufferSize configures websocket read buffer size. Zero uses defaults.
 	ReadBufferSize int
 	// WriteBufferSize configures websocket write buffer size. Zero uses defaults.
@@ -102,83 +109,136 @@ type ToolingConfig struct {
 	DebugPathPrefix string
 }
 
+// BuildOriginAllowlistCheck returns a CheckOrigin function that allows requests
+// whose Origin header matches one of the given origins.
+//
+// Matching rules:
+//   - Origins compare case-insensitively on scheme://host[:port].
+//   - "*" allows every origin.
+//   - A leading "*." in the host allows any subdomain, e.g.
+//     "https://*.example.com" matches "https://app.example.com".
+//   - Requests without an Origin header (non-browser clients) are allowed,
+//     matching the conventional browser-only scope of origin policies.
+//
+// Use with BridgeConfig.CheckOrigin or the WithAllowedOrigins server option.
+func BuildOriginAllowlistCheck(allowedOrigins ...string) func(r *http.Request) bool {
+	normalized := make([]string, 0, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		origin = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(origin, "/")))
+		if origin != "" {
+			normalized = append(normalized, origin)
+		}
+	}
+
+	return func(r *http.Request) bool {
+		if r == nil {
+			return false
+		}
+		requestOrigin := strings.ToLower(strings.TrimSpace(strings.TrimSuffix(r.Header.Get("Origin"), "/")))
+		if requestOrigin == "" {
+			return true
+		}
+		for _, allowed := range normalized {
+			if allowed == "*" || allowed == requestOrigin {
+				return true
+			}
+			if scheme, hostSuffix, ok := splitOriginWildcard(allowed); ok {
+				if strings.HasPrefix(requestOrigin, scheme+"://") && strings.HasSuffix(requestOrigin, hostSuffix) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+}
+
+// splitOriginWildcard decomposes an "scheme://*.host" allowlist entry into its
+// scheme and required host suffix (including the leading dot).
+func splitOriginWildcard(allowedOrigin string) (scheme string, hostSuffix string, ok bool) {
+	scheme, host, found := strings.Cut(allowedOrigin, "://")
+	if !found || !strings.HasPrefix(host, "*.") {
+		return "", "", false
+	}
+	return scheme, host[1:], true
+}
+
 // ApplyTunnelInsecureCredentials appends insecure transport credentials to the
 // provided grpc dial option slice and returns the resulting slice.
-func ApplyTunnelInsecureCredentials(parseDialOptions []grpc.DialOption) []grpc.DialOption {
-	parseResult := append([]grpc.DialOption{}, parseDialOptions...)
-	parseResult = append(parseResult, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	return parseResult
+func ApplyTunnelInsecureCredentials(dialOptions []grpc.DialOption) []grpc.DialOption {
+	result := append([]grpc.DialOption{}, dialOptions...)
+	result = append(result, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return result
 }
 
 // GetReconnectConfigError validates optional reconnect policy settings.
-func GetReconnectConfigError(parseConfig ReconnectConfig) error {
-	if parseConfig.InitialDelay < 0 {
+func GetReconnectConfigError(cfg ReconnectConfig) error {
+	if cfg.InitialDelay < 0 {
 		return fmt.Errorf("grpctunnel: reconnect InitialDelay must be >= 0")
 	}
-	if parseConfig.MaxDelay < 0 {
+	if cfg.MaxDelay < 0 {
 		return fmt.Errorf("grpctunnel: reconnect MaxDelay must be >= 0")
 	}
-	if parseConfig.MinConnectTimeout < 0 {
+	if cfg.MinConnectTimeout < 0 {
 		return fmt.Errorf("grpctunnel: reconnect MinConnectTimeout must be >= 0")
 	}
-	if parseConfig.Multiplier < 0 {
+	if cfg.Multiplier < 0 {
 		return fmt.Errorf("grpctunnel: reconnect Multiplier must be >= 0")
 	}
-	if math.IsNaN(parseConfig.Multiplier) || math.IsInf(parseConfig.Multiplier, 0) {
+	if math.IsNaN(cfg.Multiplier) || math.IsInf(cfg.Multiplier, 0) {
 		return fmt.Errorf("grpctunnel: reconnect Multiplier must be finite")
 	}
-	if parseConfig.Jitter < 0 {
+	if cfg.Jitter < 0 {
 		return fmt.Errorf("grpctunnel: reconnect Jitter must be >= 0")
 	}
-	if math.IsNaN(parseConfig.Jitter) || math.IsInf(parseConfig.Jitter, 0) {
+	if math.IsNaN(cfg.Jitter) || math.IsInf(cfg.Jitter, 0) {
 		return fmt.Errorf("grpctunnel: reconnect Jitter must be finite")
 	}
 	return nil
 }
 
 // ApplyTunnelReconnectPolicy appends reconnect dial options onto an option slice.
-func ApplyTunnelReconnectPolicy(parseDialOptions []grpc.DialOption, parseConfig ReconnectConfig) ([]grpc.DialOption, error) {
-	if parseErr := GetReconnectConfigError(parseConfig); parseErr != nil {
-		return nil, parseErr
+func ApplyTunnelReconnectPolicy(dialOptions []grpc.DialOption, cfg ReconnectConfig) ([]grpc.DialOption, error) {
+	if err := GetReconnectConfigError(cfg); err != nil {
+		return nil, err
 	}
 
-	parseBackoffConfig := grpcbackoff.DefaultConfig
-	if parseConfig.InitialDelay > 0 {
-		parseBackoffConfig.BaseDelay = parseConfig.InitialDelay
+	backoffConfig := grpcbackoff.DefaultConfig
+	if cfg.InitialDelay > 0 {
+		backoffConfig.BaseDelay = cfg.InitialDelay
 	}
-	if parseConfig.MaxDelay > 0 {
-		parseBackoffConfig.MaxDelay = parseConfig.MaxDelay
+	if cfg.MaxDelay > 0 {
+		backoffConfig.MaxDelay = cfg.MaxDelay
 	}
-	if parseConfig.Multiplier > 0 {
-		parseBackoffConfig.Multiplier = parseConfig.Multiplier
+	if cfg.Multiplier > 0 {
+		backoffConfig.Multiplier = cfg.Multiplier
 	}
-	if parseConfig.Jitter > 0 {
-		parseBackoffConfig.Jitter = parseConfig.Jitter
-	}
-
-	parseConnectParams := grpc.ConnectParams{
-		Backoff: parseBackoffConfig,
-	}
-	if parseConfig.MinConnectTimeout > 0 {
-		parseConnectParams.MinConnectTimeout = parseConfig.MinConnectTimeout
+	if cfg.Jitter > 0 {
+		backoffConfig.Jitter = cfg.Jitter
 	}
 
-	parseResult := append([]grpc.DialOption{}, parseDialOptions...)
-	parseResult = append(parseResult, grpc.WithConnectParams(parseConnectParams))
-	return parseResult, nil
+	connectParams := grpc.ConnectParams{
+		Backoff: backoffConfig,
+	}
+	if cfg.MinConnectTimeout > 0 {
+		connectParams.MinConnectTimeout = cfg.MinConnectTimeout
+	}
+
+	result := append([]grpc.DialOption{}, dialOptions...)
+	result = append(result, grpc.WithConnectParams(connectParams))
+	return result, nil
 }
 
 // buildTunnelGRPCDialTarget normalizes gRPC dial target values for custom websocket dialers.
-func buildTunnelGRPCDialTarget(parseTarget string, parseTunnelURL string) string {
-	parseTrimmedTarget := strings.TrimSpace(parseTarget)
-	if parseTrimmedTarget == "" {
-		return parseTunnelURL
+func buildTunnelGRPCDialTarget(target string, tunnelURL string) string {
+	trimmedTarget := strings.TrimSpace(target)
+	if trimmedTarget == "" {
+		return tunnelURL
 	}
 
-	parseTargetURL, parseErr := url.Parse(parseTrimmedTarget)
-	if parseErr == nil && (parseTargetURL.Scheme == "ws" || parseTargetURL.Scheme == "wss") && parseTargetURL.Host != "" {
-		return parseTargetURL.Host
+	targetURL, err := url.Parse(trimmedTarget)
+	if err == nil && (targetURL.Scheme == "ws" || targetURL.Scheme == "wss") && targetURL.Host != "" {
+		return targetURL.Host
 	}
 
-	return parseTrimmedTarget
+	return trimmedTarget
 }

@@ -3,7 +3,14 @@
 // Server-side entry points:
 //   - BuildBridgeHandler and HandleBridgeMux for typed composition
 //   - Wrap for middleware-style integration
-//   - Serve and ListenAndServe for convenience startup
+//   - NewServer for a shutdown-capable *http.Server
+//   - Serve, ListenAndServe, and ListenAndServeTLS for convenience startup
+//
+// Server-side hardening:
+//   - WithAllowedOrigins / BuildOriginAllowlistCheck for origin allowlisting
+//   - WithAuthorize for pre-upgrade request authorization (403 on failure)
+//   - WithMaxActiveConnections, WithMaxConnectionsPerClient, and
+//     WithMaxUpgradesPerClientPerMinute for abuse controls
 //
 // Client-side entry points:
 //   - BuildTunnelConn for typed connection setup

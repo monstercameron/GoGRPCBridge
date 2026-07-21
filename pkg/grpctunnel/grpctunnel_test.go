@@ -533,7 +533,7 @@ func TestGetTunnelConfigError_EmptyTarget(parseT *testing.T) {
 }
 
 func TestParseTunnelTargetURL_InvalidScheme(parseT *testing.T) {
-	_, parseErr := ParseTunnelTargetURL("http://localhost:8080", false)
+	_, parseErr := ParseTunnelTargetURL("ftp://localhost:8080", false)
 	if parseErr == nil {
 		parseT.Fatal("Expected invalid scheme error")
 	}

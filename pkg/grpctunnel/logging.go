@@ -12,104 +12,104 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const parseDefaultGrpctunnelLogLevel = "INFO"
-const parseDefaultGrpctunnelLogEvent = "grpctunnel_event"
-const parseDefaultGrpctunnelLogComponent = "grpctunnel"
+const defaultGrpctunnelLogLevel = "INFO"
+const defaultGrpctunnelLogEvent = "grpctunnel_event"
+const defaultGrpctunnelLogComponent = "grpctunnel"
 
 // logGrpctunnelEvent emits one structured grpctunnel log event line.
-func logGrpctunnelEvent(parseComponent string, parseLevel string, parseEvent string, parseRequest *http.Request, parseErr error, parseMessage string) {
-	log.Printf("%s", buildGrpctunnelLogLine(parseComponent, parseLevel, parseEvent, parseRequest, parseErr, parseMessage))
+func logGrpctunnelEvent(component string, level string, event string, r *http.Request, err error, msg string) {
+	log.Printf("%s", buildGrpctunnelLogLine(component, level, event, r, err, msg))
 }
 
 // buildGrpctunnelLogLine builds a structured grpctunnel log line with optional request and OTel context fields.
-func buildGrpctunnelLogLine(parseComponent string, parseLevel string, parseEvent string, parseRequest *http.Request, parseErr error, parseMessage string) string {
-	parseComponent = strings.TrimSpace(parseComponent)
-	if parseComponent == "" {
-		parseComponent = parseDefaultGrpctunnelLogComponent
+func buildGrpctunnelLogLine(component string, level string, event string, r *http.Request, err error, msg string) string {
+	component = strings.TrimSpace(component)
+	if component == "" {
+		component = defaultGrpctunnelLogComponent
 	}
-	parseLevel = strings.TrimSpace(parseLevel)
-	if parseLevel == "" {
-		parseLevel = parseDefaultGrpctunnelLogLevel
+	level = strings.TrimSpace(level)
+	if level == "" {
+		level = defaultGrpctunnelLogLevel
 	}
-	parseEvent = strings.TrimSpace(parseEvent)
-	if parseEvent == "" {
-		parseEvent = parseDefaultGrpctunnelLogEvent
+	event = strings.TrimSpace(event)
+	if event == "" {
+		event = defaultGrpctunnelLogEvent
 	}
 
-	parseBuilder := strings.Builder{}
-	appendGrpctunnelLogField(&parseBuilder, "component", parseComponent)
-	appendGrpctunnelLogField(&parseBuilder, "level", parseLevel)
-	appendGrpctunnelLogField(&parseBuilder, "event", parseEvent)
-	appendGrpctunnelLogField(&parseBuilder, "msg", parseMessage)
+	b := strings.Builder{}
+	appendGrpctunnelLogField(&b, "component", component)
+	appendGrpctunnelLogField(&b, "level", level)
+	appendGrpctunnelLogField(&b, "event", event)
+	appendGrpctunnelLogField(&b, "msg", msg)
 
-	if parseRequest != nil {
-		appendGrpctunnelLogField(&parseBuilder, "request_id", getGrpctunnelRequestID(parseRequest))
-		appendGrpctunnelLogField(&parseBuilder, "remote_addr", strings.TrimSpace(parseRequest.RemoteAddr))
-		appendGrpctunnelLogField(&parseBuilder, "origin", strings.TrimSpace(parseRequest.Header.Get("Origin")))
-		appendGrpctunnelLogField(&parseBuilder, "method", strings.TrimSpace(parseRequest.Method))
-		if parseRequest.URL != nil {
-			appendGrpctunnelLogField(&parseBuilder, "path", strings.TrimSpace(parseRequest.URL.Path))
+	if r != nil {
+		appendGrpctunnelLogField(&b, "request_id", getGrpctunnelRequestID(r))
+		appendGrpctunnelLogField(&b, "remote_addr", strings.TrimSpace(r.RemoteAddr))
+		appendGrpctunnelLogField(&b, "origin", strings.TrimSpace(r.Header.Get("Origin")))
+		appendGrpctunnelLogField(&b, "method", strings.TrimSpace(r.Method))
+		if r.URL != nil {
+			appendGrpctunnelLogField(&b, "path", strings.TrimSpace(r.URL.Path))
 		}
 
-		parseTraceID, parseSpanID := getGrpctunnelTraceSpanIDs(parseRequest.Context())
-		appendGrpctunnelLogField(&parseBuilder, "trace_id", parseTraceID)
-		appendGrpctunnelLogField(&parseBuilder, "span_id", parseSpanID)
+		traceID, spanID := getGrpctunnelTraceSpanIDs(r.Context())
+		appendGrpctunnelLogField(&b, "trace_id", traceID)
+		appendGrpctunnelLogField(&b, "span_id", spanID)
 	}
 
-	if parseErr != nil {
-		appendGrpctunnelLogField(&parseBuilder, "error", strings.TrimSpace(parseErr.Error()))
+	if err != nil {
+		appendGrpctunnelLogField(&b, "error", strings.TrimSpace(err.Error()))
 	}
 
-	return parseBuilder.String()
+	return b.String()
 }
 
 // appendGrpctunnelLogField appends one key/value field to a structured grpctunnel log line.
-func appendGrpctunnelLogField(parseBuilder *strings.Builder, parseKey string, parseValue string) {
-	if parseBuilder == nil {
+func appendGrpctunnelLogField(b *strings.Builder, key string, value string) {
+	if b == nil {
 		return
 	}
-	parseKey = strings.TrimSpace(parseKey)
-	parseValue = strings.TrimSpace(parseValue)
-	if parseKey == "" || parseValue == "" {
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+	if key == "" || value == "" {
 		return
 	}
-	if parseBuilder.Len() > 0 {
-		parseBuilder.WriteByte(' ')
+	if b.Len() > 0 {
+		b.WriteByte(' ')
 	}
-	parseBuilder.WriteString(parseKey)
-	parseBuilder.WriteByte('=')
-	parseBuilder.WriteString(strconv.Quote(parseValue))
+	b.WriteString(key)
+	b.WriteByte('=')
+	b.WriteString(strconv.Quote(value))
 }
 
 // getGrpctunnelRequestID resolves a correlation/request identifier from common ingress headers.
-func getGrpctunnelRequestID(parseRequest *http.Request) string {
-	if parseRequest == nil {
+func getGrpctunnelRequestID(r *http.Request) string {
+	if r == nil {
 		return ""
 	}
 
-	parseRequestIDHeaders := []string{
+	requestIDHeaders := []string{
 		"X-Request-Id",
 		"X-Request-ID",
 		"X-Correlation-Id",
 		"X-Correlation-ID",
 	}
-	for _, parseHeaderName := range parseRequestIDHeaders {
-		parseHeaderValue := strings.TrimSpace(parseRequest.Header.Get(parseHeaderName))
-		if parseHeaderValue != "" {
-			return parseHeaderValue
+	for _, headerName := range requestIDHeaders {
+		headerValue := strings.TrimSpace(r.Header.Get(headerName))
+		if headerValue != "" {
+			return headerValue
 		}
 	}
 	return ""
 }
 
 // getGrpctunnelTraceSpanIDs returns OTel trace/span identifiers from context when available.
-func getGrpctunnelTraceSpanIDs(parseContext context.Context) (string, string) {
-	if parseContext == nil {
+func getGrpctunnelTraceSpanIDs(ctx context.Context) (string, string) {
+	if ctx == nil {
 		return "", ""
 	}
-	parseSpanContext := trace.SpanContextFromContext(parseContext)
-	if !parseSpanContext.IsValid() {
+	spanContext := trace.SpanContextFromContext(ctx)
+	if !spanContext.IsValid() {
 		return "", ""
 	}
-	return parseSpanContext.TraceID().String(), parseSpanContext.SpanID().String()
+	return spanContext.TraceID().String(), spanContext.SpanID().String()
 }

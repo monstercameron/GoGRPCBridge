@@ -2,6 +2,17 @@
 
 This guide covers migration to the typed `grpctunnel` API.
 
+## v0.1.0 Behavior Changes
+
+No exported API was renamed or removed in v0.1.0. Behavior deltas to review:
+
+- Server `net.Conn` adapter: a non-binary websocket frame now returns an explicit protocol error instead of a clean `io.EOF`. Code that treated a text frame as normal stream end (unlikely by design) now sees an error.
+- Client targets: `http://` and `https://` URLs are now accepted and mapped to `ws://`/`wss://` (both native and WASM builds). Previously native builds rejected them and WASM builds produced malformed URLs.
+- WASM target validation: unsupported schemes (e.g. `ftp://`) are now rejected with an error instead of being silently mangled into a `ws://` prefix.
+- `pkg/bridge` is formally deprecated; migrate to `pkg/grpctunnel` using the mapping below.
+
+New in v0.1.0 (additive): `BridgeConfig.Authorize`/`WithAuthorize`, `WithAllowedOrigins`/`BuildOriginAllowlistCheck`, `NewServer`, and `ListenAndServeTLS`.
+
 ## Quick Migration Checklist
 
 1. Replace legacy client dial calls with `BuildTunnelConn`.
@@ -36,30 +47,30 @@ Legacy wrappers (`Dial`, `DialContext`, `Wrap`, `Serve`, `ListenAndServe`) remai
 ## Client Example (Non-WASM)
 
 ```go
-parseConnection, parseConnectionError := grpctunnel.BuildTunnelConn(parseContext, grpctunnel.TunnelConfig{
+conn, err := grpctunnel.BuildTunnelConn(ctx, grpctunnel.TunnelConfig{
     Target: "wss://api.example.com/grpc",
     GRPCOptions: []grpc.DialOption{
-        grpc.WithTransportCredentials(credentials.NewTLS(parseTLSConfig)),
+        grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
         grpc.WithBlock(),
     },
 })
-if parseConnectionError != nil {
-    return parseConnectionError
+if err != nil {
+    return err
 }
-defer parseConnection.Close()
+defer conn.Close()
 ```
 
 ## Client Example (WASM)
 
 ```go
-parseConnection, parseConnectionError := grpctunnel.BuildTunnelConn(parseContext, grpctunnel.TunnelConfig{
+conn, err := grpctunnel.BuildTunnelConn(ctx, grpctunnel.TunnelConfig{
     Target: "", // same-origin inference
     GRPCOptions: grpctunnel.ApplyTunnelInsecureCredentials(nil),
 })
-if parseConnectionError != nil {
-    return parseConnectionError
+if err != nil {
+    return err
 }
-defer parseConnection.Close()
+defer conn.Close()
 ```
 
 Important:
@@ -70,23 +81,23 @@ Important:
 ## Server Example (Mux)
 
 ```go
-parseMux := http.NewServeMux()
+mux := http.NewServeMux()
 
-if parseHandleError := grpctunnel.HandleBridgeMux(parseMux, "/grpc", parseGrpcServer, grpctunnel.BridgeConfig{
-    CheckOrigin: parseCheckOrigin,
-}); parseHandleError != nil {
-    return parseHandleError
+if err := grpctunnel.HandleBridgeMux(mux, "/grpc", grpcServer, grpctunnel.BridgeConfig{
+    CheckOrigin: checkOrigin,
+}); err != nil {
+    return err
 }
 ```
 
 ## Validation Before Startup
 
 ```go
-if parseTunnelError := grpctunnel.GetTunnelConfigError(parseTunnelConfig); parseTunnelError != nil {
-    return parseTunnelError
+if err := grpctunnel.GetTunnelConfigError(tunnelConfig); err != nil {
+    return err
 }
-if parseBridgeError := grpctunnel.GetBridgeConfigError(parseBridgeConfig); parseBridgeError != nil {
-    return parseBridgeError
+if err := grpctunnel.GetBridgeConfigError(bridgeConfig); err != nil {
+    return err
 }
 ```
 

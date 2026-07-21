@@ -52,8 +52,18 @@ func TestParseTunnelTargetURL(parseT *testing.T) {
 			parseExpected: "wss://api.example.com/grpc",
 		},
 		{
+			parseName:     "http url maps to ws",
+			parseTarget:   "http://localhost:8080",
+			parseExpected: "ws://localhost:8080",
+		},
+		{
+			parseName:     "https url maps to wss",
+			parseTarget:   "https://api.example.com/grpc",
+			parseExpected: "wss://api.example.com/grpc",
+		},
+		{
 			parseName:      "unsupported scheme",
-			parseTarget:    "http://localhost:8080",
+			parseTarget:    "ftp://localhost:8080",
 			isWantError:    true,
 			parseErrorText: "unsupported target scheme",
 		},
@@ -120,7 +130,7 @@ func TestBuildTunnelConn_InvalidTarget(parseT *testing.T) {
 	defer clearDial()
 
 	_, parseErr := BuildTunnelConn(parseDialContext, TunnelConfig{
-		Target:      "http://localhost:8080",
+		Target:      "ftp://localhost:8080",
 		GRPCOptions: ApplyTunnelInsecureCredentials(nil),
 	})
 	if parseErr == nil {
