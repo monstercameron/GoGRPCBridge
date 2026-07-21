@@ -100,6 +100,16 @@ If a load balancer sits in front with an idle timeout below 30s, lower `PingInte
 
 Prefer native mode when you don't rely on forwarded upgrade headers — it roughly halves GC pressure per RPC.
 
+## Long-lived and high-volume streams (video, file transfer, live feeds)
+
+The tunnel has no maximum session duration and no per-stream volume cap; sustained transfer is bounded by HTTP/2 flow control and the network, not the bridge:
+
+- Measured sustained client-stream throughput (64 KB chunks, loopback): **~615 MB/s handler mode, ~835 MB/s native mode** (`BenchmarkThroughput*_64KBChunks`) — a 4K video stream needs ~3–6 MB/s, so real deployments are network-bound, not bridge-bound. A 32 MiB soak test runs through both transports in CI.
+- **Chunk your payloads** (64 KB–1 MB protobuf messages is the sweet spot). gRPC's default 4 MB max message size applies per message, and each HTTP/2 DATA frame (≤16 KB) travels as its own small websocket message, so the bridge's 16 MB websocket read limit never constrains a chunked stream.
+- **Backpressure is end-to-end**: HTTP/2 per-stream flow-control windows bound in-flight data in both directions, including in the browser (a slow WASM reader stops window updates, which stops the server; the browser-side inbound queue caps at 256 messages / 16 MB above that). Native mode adds gRPC's BDP-aware dynamic windows — prefer it for high-latency, high-throughput links.
+- **Keepalive coexists with active streams**: server pings continue during transfers and any live peer answers pongs, so the idle timeout never fires mid-stream; an upload whose sender dies is reclaimed within the idle window.
+- **Resumption is application-level**, as with any gRPC stream: a mid-stream disconnect fails the RPC with `UNAVAILABLE`, the channel redials automatically, and your app restarts the stream (e.g., from a byte offset or sequence number).
+
 ## Session hooks
 
 - `WithConnectHook` / `WithDisconnectHook` fire at true session start/end in both transport modes (native mode blocks the upgrade handler until gRPC finishes with the connection).

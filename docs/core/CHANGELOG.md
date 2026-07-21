@@ -6,6 +6,11 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+### Added
+
+- Leak and robustness regression suite: goroutine-leak tests over repeated connect/RPC/disconnect cycles (handler mode, native mode, and rejected-upgrade paths), abuse-guard slot-accounting verification, read-limit breach enforcement, 32 MiB streaming soak tests through both transports, and sustained-throughput benchmarks (~615 MB/s handler / ~835 MB/s native on 64 KB chunks, loopback).
+- Connection-lifecycle documentation for long-lived, high-volume streams (video/file transfer): chunking guidance, end-to-end backpressure, keepalive interaction with active streams, and resumption semantics.
+
 ### Changed
 
 - CI: fuzz seed corpus now runs deterministically via `-run '^Fuzz'` instead of timed `-fuzztime` fuzzing, which intermittently failed at the fuzztime boundary with the Go fuzz engine's "context deadline exceeded" worker-shutdown race on loaded runners.
