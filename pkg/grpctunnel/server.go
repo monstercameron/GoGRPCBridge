@@ -543,6 +543,9 @@ func BuildBridgeHandler(grpcServer *grpc.Server, cfg BridgeConfig) (http.Handler
 		if err := abuseGuard.reserveBridgeConnection(r, time.Now()); err != nil {
 			observability.storeBridgeUpgradeFailure(requestContext, time.Since(upgradeStart), r)
 			logGrpctunnelEvent("grpctunnel.bridge", "WARN", "ws_upgrade_rejected_abuse_control", r, err, "WebSocket upgrade rejected by abuse controls")
+			// Before http.Error, which writes the status: headers set afterwards
+			// are headers nobody receives.
+			setRetryAfter(w, err)
 			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 			return
 		}

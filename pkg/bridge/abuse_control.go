@@ -59,12 +59,20 @@ func (parseGuard *handlerAbuseGuard) reserveHandlerConnection(parseRequest *http
 			}
 		}
 		if parseWindow.getWindowCount >= parseGuard.setConfig.MaxUpgradesPerClientPerMinute {
-			return fmt.Errorf("upgrade rate exceeded for client %q", parseClientKey)
+			// The one refusal whose end is knowable: a fixed window reopens at a
+			// computable instant, so the client is told rather than left to guess.
+			return parseAbuseRefusal{
+				setReason: fmt.Sprintf("upgrade rate exceeded for client %q", parseClientKey),
+				setWait:   parseWindow.getWindowStartedAt.Add(parseHandlerAbuseWindowDuration).Sub(parseNow),
+			}
 		}
 		parseWindow.getWindowCount++
 		parseGuard.storeClientUpgradeAttempts[parseClientKey] = parseWindow
 	}
 
+	// No Retry-After on either connection cap, deliberately: a slot frees when
+	// some other client disconnects, which is not a schedule anybody here can
+	// compute. See pkg/bridge/retry_after.go.
 	if parseGuard.setConfig.MaxActiveConnections > 0 && parseGuard.getActiveConnections >= parseGuard.setConfig.MaxActiveConnections {
 		return fmt.Errorf("active connection cap exceeded")
 	}

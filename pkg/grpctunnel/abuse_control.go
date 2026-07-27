@@ -63,12 +63,22 @@ func (g *bridgeAbuseGuard) reserveBridgeConnection(r *http.Request, now time.Tim
 			}
 		}
 		if window.getWindowCount >= g.setConfig.MaxUpgradesPerClientPerMinute {
-			return fmt.Errorf("upgrade rate exceeded for client %q", clientKey)
+			// The one refusal whose end is knowable: a fixed window reopens at a
+			// computable instant, so the client is told rather than left to guess.
+			return abuseRefusal{
+				reason: fmt.Sprintf("upgrade rate exceeded for client %q", clientKey),
+				wait:   window.getWindowStartedAt.Add(bridgeAbuseWindowDuration).Sub(now),
+			}
 		}
 		window.getWindowCount++
 		g.storeClientUpgradeAttempts[clientKey] = window
 	}
 
+	// No Retry-After on either connection cap, and that is a decision rather than
+	// an omission: a slot frees when some other client disconnects, which is not
+	// a schedule and cannot be computed from here. A number invented for it would
+	// be worse than silence, because a client that trusted it would return at a
+	// time nothing was promised about.
 	if g.setConfig.MaxActiveConnections > 0 && g.getActiveConnections >= g.setConfig.MaxActiveConnections {
 		return fmt.Errorf("active connection cap exceeded")
 	}

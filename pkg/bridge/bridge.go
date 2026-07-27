@@ -294,6 +294,9 @@ func (parseH *Handler) ServeHTTP(parseW http.ResponseWriter, parseR *http.Reques
 
 	if parseErr := parseH.abuseGuard.reserveHandlerConnection(parseR, time.Now()); parseErr != nil {
 		logBridgeEvent(parseH.logger, "WARN", "ws_upgrade_rejected_abuse_control", parseR, parseErr, "WebSocket upgrade rejected by abuse controls")
+		// Before http.Error, which writes the status: a header set after that is
+		// a header nobody receives.
+		setRetryAfterHeader(parseW, parseErr)
 		http.Error(parseW, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 		return
 	}
