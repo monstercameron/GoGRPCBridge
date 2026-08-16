@@ -117,18 +117,18 @@ func (c *webSocketConn) RemoteAddr() net.Addr {
 
 // SetDeadline sets read and write deadlines on the underlying WebSocket.
 func (c *webSocketConn) SetDeadline(t time.Time) error {
-	c.deadlineMu.Lock()
-	defer c.deadlineMu.Unlock()
-	if c.ws == nil {
-		return net.ErrClosed
-	}
-	if err := c.ws.SetReadDeadline(t); err != nil {
+	if err := c.SetReadDeadline(t); err != nil {
 		return err
 	}
-	return c.ws.SetWriteDeadline(t)
+	return c.SetWriteDeadline(t)
 }
 
 // SetReadDeadline sets the read deadline on the underlying WebSocket.
+//
+// gorilla's Conn.SetReadDeadline delegates straight to the underlying
+// net.Conn, whose deadline methods are goroutine-safe by contract, so no
+// serialization against a concurrent Read is needed here — unlike the
+// write side below, there is no library-internal field involved.
 func (c *webSocketConn) SetReadDeadline(t time.Time) error {
 	c.deadlineMu.Lock()
 	defer c.deadlineMu.Unlock()
@@ -138,12 +138,38 @@ func (c *webSocketConn) SetReadDeadline(t time.Time) error {
 	return c.ws.SetReadDeadline(t)
 }
 
-// SetWriteDeadline sets the write deadline on the underlying WebSocket.
+// SetWriteDeadline sets the write deadline for future writes.
+//
+// This CANNOT simply call gorilla's Conn.SetWriteDeadline under its own
+// little mutex: gorilla stores the deadline in a plain field that every
+// frame flush reads unsynchronized, and gorilla's documented concurrency
+// model permits only ONE goroutine in the write path at a time —
+// SetWriteDeadline included. grpc-go violates that pairing by design:
+// http2Client.Close calls SetWriteDeadline(now) specifically to kick a
+// loopyWriter that is mid-WriteMessage on another goroutine. The race
+// detector caught exactly that pairing through this adapter (found by
+// AnimeFeedFlux's CI, 2026-08-15).
+//
+// So: when no write is in flight, take the write lock and set gorilla's
+// deadline normally — future frames honour it. When a write IS in flight,
+// blocking on writeMu would invert the caller's intent (grpc sets a
+// past deadline precisely to UNBLOCK that write, and would instead
+// deadlock behind it until TCP gave up), so the deadline is applied to the
+// underlying net.Conn directly — goroutine-safe by net.Conn's contract,
+// and it interrupts the in-flight frame exactly as the caller wanted.
+// gorilla's next flush overwrites the underlying deadline from its own
+// field, which is fine: by then the interrupted write has already returned
+// an error and the connection is tearing down.
 func (c *webSocketConn) SetWriteDeadline(t time.Time) error {
-	c.deadlineMu.Lock()
-	defer c.deadlineMu.Unlock()
 	if c.ws == nil {
 		return net.ErrClosed
 	}
-	return c.ws.SetWriteDeadline(t)
+	if c.writeMu.TryLock() {
+		defer c.writeMu.Unlock()
+		return c.ws.SetWriteDeadline(t)
+	}
+	if u := c.ws.NetConn(); u != nil {
+		return u.SetWriteDeadline(t)
+	}
+	return net.ErrClosed
 }
