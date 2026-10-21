@@ -602,8 +602,8 @@ const (
 	getRunnerBenchmarkPayloadSavingsThresholdPercent    = 15.0
 	getRunnerBenchmarkBidiMemorySavingsThresholdPercent = 40.0
 	getRunnerBenchmarkBidiAllocsSavingsThresholdPercent = 30.0
-	getRunnerBenchmarkGateAttempts                = 2
-	getRunnerBenchmarkGateRetryDelay              = 2 * time.Second
+	getRunnerBenchmarkGateAttempts                      = 2
+	getRunnerBenchmarkGateRetryDelay                    = 2 * time.Second
 )
 
 // handleRunnerQuality runs enforceable quality gates for CI and local validation.
