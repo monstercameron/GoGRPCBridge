@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -280,16 +281,19 @@ func applyBridgeConnectionSettings(ws *websocket.Conn, cfg BridgeConfig) (func()
 		ws.SetReadLimit(readLimitBytes)
 	}
 
+	var lastPong atomic.Int64
 	if cfg.IdleTimeout > 0 {
+		lastPong.Store(time.Now().UnixNano())
 		if err := ws.SetReadDeadline(time.Now().Add(cfg.IdleTimeout)); err != nil {
 			return nil, err
 		}
 		ws.SetPongHandler(func(string) error {
+			lastPong.Store(time.Now().UnixNano())
 			return ws.SetReadDeadline(time.Now().Add(cfg.IdleTimeout))
 		})
 	}
 
-	if cfg.PingInterval <= 0 {
+	if cfg.PingInterval <= 0 && cfg.IdleTimeout <= 0 {
 		return func() {}, nil
 	}
 
@@ -297,16 +301,36 @@ func applyBridgeConnectionSettings(ws *websocket.Conn, cfg BridgeConfig) (func()
 	var stopOnce sync.Once
 	writeTimeout := buildBridgePingWriteTimeout(cfg)
 	go func() {
-		ticker := time.NewTicker(cfg.PingInterval)
-		defer ticker.Stop()
+		var pingTicker *time.Ticker
+		var pingChannel <-chan time.Time
+		if cfg.PingInterval > 0 {
+			pingTicker = time.NewTicker(cfg.PingInterval)
+			pingChannel = pingTicker.C
+			defer pingTicker.Stop()
+		}
+
+		var idleTimer *time.Timer
+		var idleChannel <-chan time.Time
+		if cfg.IdleTimeout > 0 {
+			idleTimer = time.NewTimer(cfg.IdleTimeout)
+			idleChannel = idleTimer.C
+			defer idleTimer.Stop()
+		}
 
 		for {
 			select {
-			case <-ticker.C:
+			case <-pingChannel:
 				if err := ws.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
 					_ = ws.Close()
 					return
 				}
+			case <-idleChannel:
+				remaining := cfg.IdleTimeout - time.Since(time.Unix(0, lastPong.Load()))
+				if remaining <= 0 {
+					_ = ws.Close()
+					return
+				}
+				idleTimer.Reset(remaining)
 			case <-stopChannel:
 				return
 			}

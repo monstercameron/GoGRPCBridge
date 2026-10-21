@@ -30,7 +30,7 @@ On the client, `Dial`/`DialContext` return immediately (non-blocking, standard g
 ## How disconnects are detected
 
 - **Clean close** (tab closed, `conn.Close()`): the websocket close frame ends the session immediately. `OnDisconnect` fires; metrics decrement; abuse-guard slots release.
-- **Dead peer, server side**: missed pongs hit the idle timeout → server closes the socket → same cleanup path. Bounded by `IdleTimeout` (default 120s).
+- **Dead peer, server side**: missed pongs hit the idle timeout → server closes the socket → same cleanup path. An independent watchdog enforces `IdleTimeout` (default 120s) even when the HTTP/2 transport changes the WebSocket read deadline.
 - **Dead peer, client side**: with `WithTunnelKeepalive`, a missed ping ack marks the connection dead after `interval + timeout` (default 50s worst case) and the channel starts reconnecting. Without it, detection happens on the next write failure.
 - **Server shutdown**: `NewServer(...).Shutdown(ctx)` stops new upgrades. Note that hijacked websocket connections are not tracked by `http.Server`, so live tunnels are not waited on — stop the gRPC server (`GracefulStop`) to drain RPCs, then close.
 

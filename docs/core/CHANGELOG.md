@@ -6,6 +6,15 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+### Security and compatibility
+
+- Updated `x/net`, `x/text`, grpc-go, and related dependencies to patched versions; the nested `examples/wasm-client` module now uses matching Go 1.26 dependency metadata so read-only CI builds succeed.
+- Updated CI scanners to run with a patched Go 1.27.3 toolchain and a Go 1.27-compatible `govulncheck` version.
+
+### Fixed
+
+- Server keepalive now closes a silent WebSocket with an independent idle watchdog even if the HTTP/2 server replaces its read deadline (`TestKeepaliveWatchdogSurvivesReadDeadlineReset`).
+
 ## [v1.1.1] - 2026-07-21
 
 ### Security

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/monstercameron/GoGRPCBridge/examples/_shared/proto"
 
 	"google.golang.org/grpc"
@@ -89,6 +90,50 @@ func TestKeepalive_DetectsDeadPeer(t *testing.T) {
 		// Idle timeout fired and the bridge reclaimed the session.
 	case <-time.After(5 * time.Second):
 		t.Fatal("bridge did not reclaim dead connection within 5s")
+	}
+}
+
+// TestKeepaliveWatchdogSurvivesReadDeadlineReset verifies that the explicit
+// keepalive watchdog still reclaims a silent peer after another layer clears
+// the WebSocket read deadline.
+func TestKeepaliveWatchdogSurvivesReadDeadlineReset(t *testing.T) {
+	closed := make(chan struct{}, 1)
+	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ws, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		stopKeepalive, err := applyBridgeConnectionSettings(ws, BridgeConfig{
+			PingInterval: 100 * time.Millisecond,
+			IdleTimeout:  300 * time.Millisecond,
+		})
+		if err != nil {
+			_ = ws.Close()
+			return
+		}
+		defer stopKeepalive()
+		defer ws.Close()
+
+		// HTTP/2 ServeConn can clear the underlying read deadline while
+		// taking ownership of the connection.
+		_ = ws.SetReadDeadline(time.Time{})
+		_, _, _ = ws.ReadMessage()
+		closed <- struct{}{}
+	}))
+	defer server.Close()
+
+	clientURL := "ws" + server.URL[4:]
+	client, _, err := websocket.DefaultDialer.Dial(clientURL, nil)
+	if err != nil {
+		t.Fatalf("websocket dial failed: %v", err)
+	}
+	defer client.Close()
+
+	select {
+	case <-closed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("keepalive watchdog did not close silent peer after read deadline reset")
 	}
 }
 
