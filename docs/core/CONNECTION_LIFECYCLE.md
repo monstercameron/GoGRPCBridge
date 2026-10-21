@@ -96,7 +96,7 @@ If a load balancer sits in front with an idle timeout below 30s, lower `PingInte
 | Server-stream drain | baseline | **~20% faster, −46% bytes** |
 | Upgrade-header → RPC metadata forwarding | yes (`x-request-id`, `traceparent`, …) | no (connection-level logging only) |
 | gRPC server keepalive/settings | not applied | fully applied |
-| `grpcServer.GracefulStop()` with active tunnels | **panics** (grpc-go's ServeHTTP transport has an unimplemented `Drain()`; pinned by `TestGracefulDrain_HandlerModeLimitation`) | drains correctly: waits for in-flight streams, rejects new sessions |
+| `grpcServer.GracefulStop()` with active tunnels | returns without waiting for hijacked websocket streams; use bounded session shutdown | drains correctly: waits for in-flight streams, rejects new sessions |
 | Requirement | — | `grpc.Server` must not carry transport credentials (TLS terminates at the websocket/HTTP layer) |
 
 Prefer native mode when you don't rely on forwarded upgrade headers — it roughly halves GC pressure per RPC.
@@ -120,7 +120,7 @@ What is verified in this repo's test suite versus what you must validate in your
 1. **Slow readers / backpressure** — a sender pushing into a stalled peer blocks after ~2 MB in flight (HTTP/2 flow control), and drains cleanly once the peer reads. Browser-side inbound queues cap at 256 messages / 16 MB above flow control.
 2. **Concurrent streaming workloads** — 12 simultaneous clients each streaming 4 MiB complete with full integrity in both transport modes; goroutine-leak tests confirm per-session resources release.
 3. **Reconnect storms** — a 16-client fleet dropped by a hard outage reconnects concurrently once the bridge returns. Note two per-instance interactions: `WithMaxUpgradesPerClientPerMinute` counts reconnecting clients (behind one NAT they share a key — size the limit for herd recovery), and gRPC's backoff jitter naturally spreads the storm.
-4. **Deployment draining** — in **native mode**, `grpcServer.GracefulStop()` waits for in-flight tunneled streams and rejects new ones. In **handler mode `GracefulStop` panics with active tunnels** (grpc-go limitation); drain handler-mode deployments by stopping new upgrades (shut the HTTP server), bounding remaining sessions with `WithSessionMaxLifetime`, then calling `Stop()`.
+4. **Deployment draining** — in **native mode**, `grpcServer.GracefulStop()` waits for in-flight tunneled streams and rejects new ones. In **handler mode**, the websocket connection is hijacked from `net/http`, so `GracefulStop()` returns without waiting for active tunnels. Stop new upgrades through your HTTP server shutdown path, let `WithSessionMaxLifetime` bound the remaining sessions, then call `Stop()` before closing the listener.
 5. **Token expiry during long streams** — `WithSessionMaxLifetime` force-closes sessions at a bound you align with token TTLs; clients transparently reconnect and re-pass the `Authorize` hook (verified). For per-RPC enforcement, add a standard gRPC auth interceptor on your `grpc.Server` — in handler mode it also sees forwarded upgrade headers.
 
 **Validate in your environment** (cannot be proven from inside this repo):
