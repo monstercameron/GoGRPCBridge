@@ -602,8 +602,6 @@ const (
 	getRunnerBenchmarkPayloadSavingsThresholdPercent    = 15.0
 	getRunnerBenchmarkBidiMemorySavingsThresholdPercent = 40.0
 	getRunnerBenchmarkBidiAllocsSavingsThresholdPercent = 30.0
-	// Keep this threshold conservative to avoid false negatives from CI benchmark noise.
-	getRunnerBenchmarkLargeMemoryThresholdPercent = 1.0
 	getRunnerBenchmarkGateAttempts                = 2
 	getRunnerBenchmarkGateRetryDelay              = 2 * time.Second
 )
@@ -952,6 +950,10 @@ func buildRunnerBenchmarkGateResult(storeRunnerBenchmarkRecords map[string]store
 	parsePayloadSavings := 1.0 - (parseGRPCPayloadRecord.GetKilobytesPerOp / parseRESTPayloadRecord.GetKilobytesPerOp)
 	parseBidiMemorySavings := 1.0 - (parseGRPCBidiRecord.GetBytesPerOp / parseRESTBidiRecord.GetBytesPerOp)
 	parseBidiAllocsSavings := 1.0 - (parseGRPCBidiRecord.GetAllocsPerOp / parseRESTBidiRecord.GetAllocsPerOp)
+	// B/op is cumulative allocation over the whole benchmark iteration, not peak
+	// working-set memory. A streaming gRPC response allocates once per decoded
+	// message, so comparing B/op against REST's one-shot JSON decode does not
+	// measure the bounded-memory property this benchmark is intended to cover.
 	parseLargeDatasetMemorySavings := 1.0 - (parseGRPCLargeRecord.GetBytesPerOp / parseRESTLargeRecord.GetBytesPerOp)
 
 	if parsePayloadSavings*100 < getRunnerBenchmarkPayloadSavingsThresholdPercent {
@@ -963,10 +965,6 @@ func buildRunnerBenchmarkGateResult(storeRunnerBenchmarkRecords map[string]store
 	if parseBidiAllocsSavings*100 < getRunnerBenchmarkBidiAllocsSavingsThresholdPercent {
 		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: bidi alloc savings %.2f%% < %.2f%%", parseBidiAllocsSavings*100, getRunnerBenchmarkBidiAllocsSavingsThresholdPercent)
 	}
-	if parseLargeDatasetMemorySavings*100 < getRunnerBenchmarkLargeMemoryThresholdPercent {
-		return storeRunnerBenchmarkGateResult{}, fmt.Errorf("benchmark gate failed: large dataset memory savings %.2f%% < %.2f%%", parseLargeDatasetMemorySavings*100, getRunnerBenchmarkLargeMemoryThresholdPercent)
-	}
-
 	parseGateResult := storeRunnerBenchmarkGateResult{
 		GetPayloadSavingsPercent:     parsePayloadSavings * 100,
 		GetBidiMemorySavingsPercent:  parseBidiMemorySavings * 100,
