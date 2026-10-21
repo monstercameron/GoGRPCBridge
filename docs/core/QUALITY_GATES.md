@@ -48,7 +48,10 @@ Quality summary output:
      - Payload size savings (gRPC vs REST for 1000 items): `>= 15%`
      - Bidirectional stream memory savings (gRPC vs REST): `>= 40%`
      - Bidirectional stream allocation savings (gRPC vs REST): `>= 30%`
-     - Large dataset memory savings (gRPC stream vs REST large dataset): `>= 1%`
+     - Large dataset `B/op` is reported for trend review. It is not a pass/fail
+       memory gate because `B/op` measures cumulative allocations, not peak
+       working-set memory; streaming gRPC intentionally allocates per decoded
+       message while REST decodes one aggregate JSON response.
 
 ## Baseline Snapshot
 

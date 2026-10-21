@@ -34,6 +34,6 @@ Environment-specific validation that cannot be proven from inside this repositor
 
 ## Deployment procedure
 
-- [ ] Rehearse the drain procedure for your transport mode: native mode → `grpcServer.GracefulStop()`; handler mode → stop new upgrades, let `SessionMaxLifetime` bound the tail, then `Stop()` (**never** `GracefulStop` with active handler-mode tunnels — it panics; see CONNECTION_LIFECYCLE.md).
+- [ ] Rehearse the drain procedure for your transport mode: native mode → stop new upgrades, call `grpcServer.GracefulStop()` and wait for it to return; handler mode → stop new upgrades, let `SessionMaxLifetime` bound the tail, then call `Stop()` before closing the HTTP listener (see CONNECTION_LIFECYCLE.md).
 - [ ] Verify rollout tooling treats the reconnect blip as expected (no alert storm) and that error budgets account for `UNAVAILABLE` retries during deploys.
 - [ ] Confirm observability end-to-end in production: `bridge_connections_active`, upgrade failure counters, and structured disconnect events reaching your dashboards ([DASHBOARD_QUERIES.md](../observability/DASHBOARD_QUERIES.md), [PROMETHEUS_ALERT_RULES.yaml](../../observability/PROMETHEUS_ALERT_RULES.yaml)).

@@ -314,14 +314,11 @@ func TestGracefulDrain_NativeMode(t *testing.T) {
 	runGracefulDrainTest(t, WithNativeGRPCTransport())
 }
 
-// TestGracefulDrain_HandlerModeLimitation pins the documented handler-mode
-// limitation: grpc-go's ServeHTTP transport has an unimplemented Drain(), so
-// GracefulStop PANICS while handler-mode tunnels are active. Deployments in
-// handler mode must drain by stopping new upgrades and bounding session
-// lifetime instead (see CONNECTION_LIFECYCLE.md). If a future grpc-go
-// implements Drain for ServeHTTP transports, this test fails so the docs and
-// guidance get updated.
-func TestGracefulDrain_HandlerModeLimitation(t *testing.T) {
+// TestGracefulDrain_HandlerMode pins the handler transport's shutdown
+// behavior: GracefulStop returns without waiting for websocket tunnels because
+// grpc-go does not own the hijacked HTTP connections. Deployments in handler
+// mode must stop new upgrades and bound existing sessions before Stop.
+func TestGracefulDrain_HandlerMode(t *testing.T) {
 	grpcServer := grpc.NewServer()
 	proto.RegisterTodoServiceServer(grpcServer, &mockService{})
 	defer grpcServer.Stop()
@@ -347,20 +344,27 @@ func TestGracefulDrain_HandlerModeLimitation(t *testing.T) {
 		t.Fatalf("recv failed: %v", err)
 	}
 
-	panicked := make(chan interface{}, 1)
+	stopDone := make(chan struct{})
+	stopPanic := make(chan interface{}, 1)
 	go func() {
 		defer func() {
-			panicked <- recover()
+			stopPanic <- recover()
+			close(stopDone)
 		}()
 		grpcServer.GracefulStop()
 	}()
 	select {
-	case recovered := <-panicked:
-		if recovered == nil {
-			t.Fatal("GracefulStop no longer panics in handler mode — grpc-go implemented Drain(); update CONNECTION_LIFECYCLE.md guidance and promote handler-mode draining")
+	case recovered := <-stopPanic:
+		if recovered != nil {
+			t.Fatalf("GracefulStop panicked: %v", recovered)
 		}
 	case <-time.After(10 * time.Second):
-		t.Fatal("GracefulStop neither panicked nor returned")
+		t.Fatal("GracefulStop did not return in handler mode")
+	}
+	select {
+	case <-stopDone:
+	case <-time.After(time.Second):
+		t.Fatal("GracefulStop completion was not observed")
 	}
 }
 

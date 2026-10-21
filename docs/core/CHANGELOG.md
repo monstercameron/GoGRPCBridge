@@ -6,6 +6,15 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ## [Unreleased]
 
+### Security and compatibility
+
+- Updated `x/net`, `x/text`, grpc-go, and related dependencies to patched versions; the nested `examples/wasm-client` module now uses matching Go 1.26 dependency metadata so read-only CI builds succeed.
+- Updated CI scanners to run with a patched Go 1.27.3 toolchain and a Go 1.27-compatible `govulncheck` version.
+
+### Fixed
+
+- Server keepalive now closes a silent WebSocket with an independent idle watchdog even if the HTTP/2 server replaces its read deadline (`TestKeepaliveWatchdogSurvivesReadDeadlineReset`).
+
 ## [v1.1.1] - 2026-07-21
 
 ### Security
@@ -30,7 +39,7 @@ The format is based on Keep a Changelog and this project follows semantic versio
 
 ### Fixed / Documented
 
-- **Handler-mode `GracefulStop` panics with active tunnels** — grpc-go's ServeHTTP transport has an unimplemented `Drain()`. The limitation is now pinned by a test (which fails if a future grpc-go implements it) and documented with the handler-mode drain recipe: stop new upgrades, bound remaining sessions via `WithSessionMaxLifetime`, then `Stop()`. Native transport mode drains correctly and is verified.
+- **Handler-mode shutdown guidance updated for grpc-go 1.83.2** — ServeHTTP no longer panics when `GracefulStop` is called, but hijacked websocket tunnels are not owned by the gRPC server and are not waited on. The limitation is pinned by a test and documented with the handler-mode drain recipe: stop new upgrades, bound remaining sessions via `WithSessionMaxLifetime`, then `Stop()`. Native transport mode drains correctly and is verified.
 
 ## [v1.0.0] - 2026-07-21
 
